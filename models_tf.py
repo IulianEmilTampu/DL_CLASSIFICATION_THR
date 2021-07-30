@@ -91,8 +91,8 @@ class LightOCT(object):
                         strides=2
                         )(x)
         # FCN
-        x = GlobalMaxPooling2D()(x)
-        # x = Flatten()(x)
+        # x = GlobalMaxPooling2D()(x)
+        x = Flatten()(x)
         final = Dense(units=self.num_classes, activation='softmax')(x)
 
         # save model paramenters
