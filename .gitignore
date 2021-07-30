@@ -12,3 +12,7 @@ trained_models/
 # Dataset information
 *.csv
 *.ods
+
+# skip the bash file for training multiple models (folders where the files are different)
+run_multiple_trainings.sh
+
