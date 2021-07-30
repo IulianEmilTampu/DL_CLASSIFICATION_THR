@@ -517,7 +517,8 @@ class M2(object):
                     early_stopping=True,
                     patience=20,
                     save_model_path=None,
-                    save_model_architecture_figure=False):
+                    save_model_architecture_figure=False,
+                    verbose=1):
         '''
         The training loop goes as follows for one epoch
         1 - for all the batches of data in the dataloader
@@ -547,6 +548,10 @@ class M2(object):
         self.unique_labels = unique_labels
         self.num_validation_samples = 0
         self.num_training_samples = 0
+        if verbose <= 2 and isinstance(verbose, int):
+            self.verbose=verbose
+        else:
+            print('Invalid verbose parameter. Given {} but expected 0, 1 or 2. Setting to default 1'.format(verbose))
 
         # save model architecture figure
         if save_model_architecture_figure is True:
@@ -641,18 +646,20 @@ class M2(object):
                 optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1, step, train_loss, train_acc),end='')
-                else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1,
-                                    step,
-                                    self.num_training_samples//self.batch_size,
-                                    train_loss,
-                                    train_acc)
-                            ,end='')
+                if self.verbose == 2:
+                    # print progress in the epoch
+                    if epoch == 0:
+                        print('\n', end='')
+                        print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1, step, train_loss, train_acc),end='')
+                    else:
+                        print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1,
+                                        step,
+                                        self.num_training_samples//self.batch_size,
+                                        train_loss,
+                                        train_acc)
+                                ,end='')
 
             # finisced all the training batches -> save training loss
             self.train_loss_history.append(np.mean(np.array(epoch_train_loss), axis=0))
@@ -697,22 +704,24 @@ class M2(object):
                 epoch_val_acc.append(float(val_acc))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, val_loss, val_acc),
-                            end='')
-                else:
-                    print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
-                            end='')
+                if self.verbose == 2:
+                    if epoch == 0:
+                        print('\r', end='')
+                        print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, val_loss, val_acc),
+                                end='')
+                    else:
+                        print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
+                                end='')
 
 
             # finisced all the batches in the validation
             self.val_loss_history.append(np.mean(np.array(epoch_val_loss), axis=0))
             self.val_acc_history.append(np.mean(np.array(epoch_val_acc), axis=0))
 
-            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
+            if self.verbose == 1 or self.verbose == 2:
+                print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
                                 self.train_loss_history[-1], self.train_acc_history[-1],
                                 self.val_loss_history[-1], self.val_acc_history[-1]))
             if epoch == 0:
@@ -732,7 +741,8 @@ class M2(object):
                 # check if model accurary improved, and update counter if needed
                 if self.val_acc_history[-1] > self.best_acc:
                     # save model checkpoint
-                    print(' - Saving model checkpoint in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' - Saving model checkpoint in {}'.format(self.save_model_path))
                     # save some extra parameters
 
                     stop = time.time()
@@ -750,7 +760,8 @@ class M2(object):
                     n_wait += 1
                 # check max waiting is reached
                 if n_wait == patience:
-                    print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                     break
 
     def test(self, test_dataloader):
@@ -905,7 +916,8 @@ class M3(object):
                     early_stopping=True,
                     patience=20,
                     save_model_path=None,
-                    save_model_architecture_figure=False):
+                    save_model_architecture_figure=False,
+                    verbose=1):
         '''
         The training loop goes as follows for one epoch
         1 - for all the batches of data in the dataloader
@@ -935,6 +947,10 @@ class M3(object):
         self.unique_labels = unique_labels
         self.num_validation_samples = 0
         self.num_training_samples = 0
+        if verbose <= 2 and isinstance(verbose, int):
+            self.verbose=verbose
+        else:
+            print('Invalid verbose parameter. Given {} but expected 0, 1 or 2. Setting to default 1'.format(verbose))
 
         # save model architecture figure
         if save_model_architecture_figure is True:
@@ -1029,18 +1045,19 @@ class M3(object):
                 optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1, step, train_loss, train_acc),end='')
-                else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1,
-                                    step,
-                                    self.num_training_samples//self.batch_size,
-                                    train_loss,
-                                    train_acc)
-                            ,end='')
+                if self.verbose == 2:
+                    if epoch == 0:
+                        print('\r', end='')
+                        print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1, step, train_loss, train_acc),end='')
+                    else:
+                        print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1,
+                                        step,
+                                        self.num_training_samples//self.batch_size,
+                                        train_loss,
+                                        train_acc)
+                                ,end='')
 
             # finisced all the training batches -> save training loss
             self.train_loss_history.append(np.mean(np.array(epoch_train_loss), axis=0))
@@ -1085,22 +1102,23 @@ class M3(object):
                 epoch_val_acc.append(float(val_acc))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, val_loss, val_acc),
-                            end='')
-                else:
-                    print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
-                            end='')
-
+                if self.verbose == 2:
+                    if epoch == 0:
+                        print('\r', end='')
+                        print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, val_loss, val_acc),
+                                end='')
+                    else:
+                        print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
+                                end='')
 
             # finisced all the batches in the validation
             self.val_loss_history.append(np.mean(np.array(epoch_val_loss), axis=0))
             self.val_acc_history.append(np.mean(np.array(epoch_val_acc), axis=0))
 
-            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
+            if self.verbose == 1 or self.verbose == 2:
+                print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
                                 self.train_loss_history[-1], self.train_acc_history[-1],
                                 self.val_loss_history[-1], self.val_acc_history[-1]))
             if epoch == 0:
@@ -1120,7 +1138,8 @@ class M3(object):
                 # check if model accurary improved, and update counter if needed
                 if self.val_acc_history[-1] > self.best_acc:
                     # save model checkpoint
-                    print(' - Saving model checkpoint in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' - Saving model checkpoint in {}'.format(self.save_model_path))
                     # save some extra parameters
 
                     stop = time.time()
@@ -1138,7 +1157,8 @@ class M3(object):
                     n_wait += 1
                 # check max waiting is reached
                 if n_wait == patience:
-                    print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                     break
 
     def test(self, test_dataloader):
@@ -1208,7 +1228,7 @@ class M3(object):
         with open(os.path.join(self.save_model_path, 'model_summary_json.txt'), 'w') as outfile:
             json.dump(model_summary, outfile)
 
-## CUSTOM MODEL M3
+## CUSTOM MODEL ResNet50
 
 class ResNet50(object):
     '''
@@ -1283,7 +1303,8 @@ class ResNet50(object):
                     early_stopping=True,
                     patience=20,
                     save_model_path=None,
-                    save_model_architecture_figure=False):
+                    save_model_architecture_figure=False,
+                    verbose=1):
         '''
         The training loop goes as follows for one epoch
         1 - for all the batches of data in the dataloader
@@ -1313,6 +1334,10 @@ class ResNet50(object):
         self.unique_labels = unique_labels
         self.num_validation_samples = 0
         self.num_training_samples = 0
+        if verbose <= 2 and isinstance(verbose, int):
+            self.verbose=verbose
+        else:
+            print('Invalid verbose parameter. Given {} but expected 0, 1 or 2. Setting to default 1'.format(verbose))
 
         # save model architecture figure
         if save_model_architecture_figure is True:
@@ -1407,18 +1432,20 @@ class ResNet50(object):
                 optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1, step, train_loss, train_acc),end='')
-                else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1,
-                                    step,
-                                    self.num_training_samples//self.batch_size,
-                                    train_loss,
-                                    train_acc)
-                            ,end='')
+                if self.verbose == 2:
+                    # print progress in the epoch
+                    if epoch == 0:
+                        print('\n', end='')
+                        print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1, step, train_loss, train_acc),end='')
+                    else:
+                        print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1,
+                                        step,
+                                        self.num_training_samples//self.batch_size,
+                                        train_loss,
+                                        train_acc)
+                                ,end='')
 
             # finisced all the training batches -> save training loss
             self.train_loss_history.append(np.mean(np.array(epoch_train_loss), axis=0))
@@ -1463,22 +1490,24 @@ class ResNet50(object):
                 epoch_val_acc.append(float(val_acc))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, val_loss, val_acc),
-                            end='')
-                else:
-                    print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
-                            end='')
+                if self.verbose == 2:
+                    if epoch == 0:
+                        print('\r', end='')
+                        print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, val_loss, val_acc),
+                                end='')
+                    else:
+                        print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
+                                end='')
 
 
             # finisced all the batches in the validation
             self.val_loss_history.append(np.mean(np.array(epoch_val_loss), axis=0))
             self.val_acc_history.append(np.mean(np.array(epoch_val_acc), axis=0))
 
-            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
+            if self.verbose == 1 or self.verbose == 2:
+                print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
                                 self.train_loss_history[-1], self.train_acc_history[-1],
                                 self.val_loss_history[-1], self.val_acc_history[-1]))
             if epoch == 0:
@@ -1498,7 +1527,8 @@ class ResNet50(object):
                 # check if model accurary improved, and update counter if needed
                 if self.val_acc_history[-1] > self.best_acc:
                     # save model checkpoint
-                    print(' - Saving model checkpoint in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' - Saving model checkpoint in {}'.format(self.save_model_path))
                     # save some extra parameters
 
                     stop = time.time()
@@ -1516,7 +1546,8 @@ class ResNet50(object):
                     n_wait += 1
                 # check max waiting is reached
                 if n_wait == patience:
-                    print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                     break
 
     def test(self, test_dataloader):
@@ -1775,7 +1806,8 @@ class VAE_original(object):
                     save_model_path=None,
                     save_model_architecture_figure=False,
                     vae_kl_weight=0.1,
-                    vae_reconst_weight=0.1):
+                    vae_reconst_weight=0.1,
+                    verbose=1):
         '''
         The training loop goes as follows for one epoch
         1 - for all the batches of data in the dataloader
@@ -1807,6 +1839,10 @@ class VAE_original(object):
         self.num_training_samples = 0
         self.vae_kl_weight=vae_kl_weight
         self.vae_reconst_weight=vae_reconst_weight
+        if verbose <= 2 and isinstance(verbose, int):
+            self.verbose=verbose
+        else:
+            print('Invalid verbose parameter. Given {} but expected 0, 1 or 2. Setting to default 1'.format(verbose))
 
         # save model architecture figure
         if save_model_architecture_figure is True:
@@ -1912,22 +1948,25 @@ class VAE_original(object):
                 optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1, step, train_loss, train_acc),end='')
-                else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1,
-                                    step,
-                                    self.num_training_samples//self.batch_size,
-                                    train_loss,
-                                    train_acc)
-                            ,end='')
+                if self.verbose == 2:
+                    # print progress in the epoch
+                    if epoch == 0:
+                        print('\n', end='')
+                        print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1, step, train_loss, train_acc),end='')
+                    else:
+                        print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1,
+                                        step,
+                                        self.num_training_samples//self.batch_size,
+                                        train_loss,
+                                        train_acc)
+                                ,end='')
 
             # finisced all the training batches -> save training loss
             self.train_loss_history.append(np.mean(np.array(epoch_train_loss), axis=0))
             self.train_acc_history.append(np.mean(np.array(epoch_train_acc), axis=0))
+
             if epoch == 0:
                 self.num_training_samples = self.batch_size*step
 
@@ -1983,22 +2022,24 @@ class VAE_original(object):
                 epoch_val_acc.append(float(val_acc))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, val_loss, val_acc),
-                            end='')
-                else:
-                    print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
-                            end='')
+                if self.verbose == 2:
+                    if epoch == 0:
+                        print('\r', end='')
+                        print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, val_loss, val_acc),
+                                end='')
+                    else:
+                        print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
+                                end='')
 
 
             # finisced all the batches in the validation
             self.val_loss_history.append(np.mean(np.array(epoch_val_loss), axis=0))
             self.val_acc_history.append(np.mean(np.array(epoch_val_acc), axis=0))
 
-            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
+            if self.verbose == 1 or self.verbose == 2:
+                print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
                                 self.train_loss_history[-1], self.train_acc_history[-1],
                                 self.val_loss_history[-1], self.val_acc_history[-1]))
             if epoch == 0:
@@ -2020,7 +2061,8 @@ class VAE_original(object):
                 # check if model accurary improved, and update counter if needed
                 if self.val_acc_history[-1] > self.best_acc:
                     # save model checkpoint
-                    print(' - Saving model checkpoint in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' - Saving model checkpoint in {}'.format(self.save_model_path))
                     # save some extra parameters
 
                     stop = time.time()
@@ -2038,7 +2080,8 @@ class VAE_original(object):
                     n_wait += 1
                 # check max waiting is reached
                 if n_wait == patience:
-                    print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                     break
 
     def test(self, test_dataloader):
@@ -2252,7 +2295,8 @@ class VAE1(object):
                     save_model_path=None,
                     save_model_architecture_figure=False,
                     vae_kl_weight=0.1,
-                    vae_reconst_weight=0.1):
+                    vae_reconst_weight=0.1,
+                    verbose=1):
         '''
         The training loop goes as follows for one epoch
         1 - for all the batches of data in the dataloader
@@ -2284,6 +2328,10 @@ class VAE1(object):
         self.num_training_samples = 0
         self.vae_kl_weight=vae_kl_weight
         self.vae_reconst_weight=vae_reconst_weight
+        if verbose <= 2 and isinstance(verbose, int):
+            self.verbose=verbose
+        else:
+            print('Invalid verbose parameter. Given {} but expected 0, 1 or 2. Setting to default 1'.format(verbose))
 
         # save model architecture figure
         if save_model_architecture_figure is True:
@@ -2391,18 +2439,19 @@ class VAE1(object):
                 optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1, step, train_loss, train_acc),end='')
-                else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1,
-                                    step,
-                                    self.num_training_samples//self.batch_size,
-                                    train_loss,
-                                    train_acc)
-                            ,end='')
+                if self.verbose == 2:
+                    if epoch == 0:
+                        print('\r', end='')
+                        print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1, step, train_loss, train_acc),end='')
+                    else:
+                        print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                                .format(epoch+1,
+                                        step,
+                                        self.num_training_samples//self.batch_size,
+                                        train_loss,
+                                        train_acc)
+                                ,end='')
 
             # finisced all the training batches -> save training loss
             self.train_loss_history.append(np.mean(np.array(epoch_train_loss), axis=0))
@@ -2462,22 +2511,24 @@ class VAE1(object):
                 epoch_val_acc.append(float(val_acc))
 
                 # print values
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, val_loss, val_acc),
-                            end='')
-                else:
-                    print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
-                            end='')
+                if self.verbose == 2:
+                    if epoch == 0:
+                        print('\r', end='')
+                        print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, val_loss, val_acc),
+                                end='')
+                    else:
+                        print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
+                                .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
+                                end='')
 
 
             # finisced all the batches in the validation
             self.val_loss_history.append(np.mean(np.array(epoch_val_loss), axis=0))
             self.val_acc_history.append(np.mean(np.array(epoch_val_acc), axis=0))
 
-            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
+            if self.verbose == 1 or self.verbose == 2:
+                print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
                                 self.train_loss_history[-1], self.train_acc_history[-1],
                                 self.val_loss_history[-1], self.val_acc_history[-1]))
             if epoch == 0:
@@ -2499,7 +2550,8 @@ class VAE1(object):
                 # check if model accurary improved, and update counter if needed
                 if self.val_acc_history[-1] > self.best_acc:
                     # save model checkpoint
-                    print(' - Saving model checkpoint in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' - Saving model checkpoint in {}'.format(self.save_model_path))
                     # save some extra parameters
 
                     stop = time.time()
@@ -2517,7 +2569,8 @@ class VAE1(object):
                     n_wait += 1
                 # check max waiting is reached
                 if n_wait == patience:
-                    print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
+                    if self.verbose == 1 or self.verbose == 2:
+                        print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                     break
 
     def test(self, test_dataloader):
