@@ -91,13 +91,17 @@ def get_first_glass_enface(volume):
     INPUT
     volume: OCT volumetric data with axes ordered [z,x,y]
     '''
-    for s in range(volume.shape[0]):
+    s = 0
+    for i in range(volume.shape[0]):
         # for all the enface slices, check if it is the first glass slide
-        threshold = 85
+        intensity_threshold = 85
+        n_of_white_pixels = 500
         # arbitrary threshold that identifies the white pixels due to the glass reflection
-        aus = np.sum(np.where( volume[s,:,:] > threshold ))
-        if aus > 500:
+        aus = np.sum(np.where( volume[i,:,:] > intensity_threshold ))
+        if aus > n_of_white_pixels:
+            s = i
             return s
+    return s
 
 # General functions to convert values to a type compatible to a tf.exampe
 def _bytes_feature(value):
