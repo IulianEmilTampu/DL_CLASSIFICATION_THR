@@ -348,7 +348,7 @@ for cv in range(N_FOLDS):
                         num_classes = len(unique_labels),
                         data_augmentation=data_augmentation,
                         class_weights = class_weights,
-                        kernel_size=(7,7),
+                        kernel_size=(5,5),
                         input_size=input_size
                         )
     elif model_configuration == 'M2':
