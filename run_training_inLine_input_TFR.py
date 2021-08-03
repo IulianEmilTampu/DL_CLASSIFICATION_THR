@@ -30,7 +30,6 @@ from sklearn.model_selection import KFold
 
 
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 import warnings
@@ -39,6 +38,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # custom imports
 import models_tf
 import utilities
+import utilities_models_tf
 
 ## parse inline parameters
 
@@ -279,7 +279,7 @@ n_test = len(test_filenames)
 seed = 29
 random.seed(seed)
 random.shuffle(train_val_file_list)
-# train_val_file_list = train_val_file_list[0:1000]
+train_val_file_list = train_val_file_list[0:1000]
 
 # cross-validation split
 kf = KFold(n_splits=N_FOLDS)
@@ -405,8 +405,8 @@ for cv in range(N_FOLDS):
 
     # train model
     print(' - Training fold...')
-    if 'VAE' in model_configuration:
-        model.train(train_dataset, val_dataset,
+    utilities_models_tf.outsideTrain(model,
+                    train_dataset, val_dataset,
                     unique_labels = unique_labels,
                     loss=[loss],
                     start_learning_rate = 0.001,
@@ -414,22 +414,9 @@ for cv in range(N_FOLDS):
                     power = 0.3,
                     vae_kl_weight=vae_kl_weight,
                     vae_reconst_weight=vae_reconst_weight,
-                    max_epochs=200,
+                    max_epochs=3,
                     early_stopping=True,
-                    patience=20,
-                    save_model_path=os.path.join(save_model_path, 'fold_'+str(cv+1)),
-                    save_model_architecture_figure=True if cv==0 else False,
-                    )
-    else:
-        model.train(train_dataset, val_dataset,
-                    unique_labels = unique_labels,
-                    loss=[loss],
-                    start_learning_rate = 0.001,
-                    scheduler = 'polynomial',
-                    power = 0.3,
-                    max_epochs=200,
-                    early_stopping=True,
-                    patience=20,
+                    patience=10,
                     save_model_path=os.path.join(save_model_path, 'fold_'+str(cv+1)),
                     save_model_architecture_figure=True if cv==0 else False,
                     verbose=verbose
@@ -443,7 +430,7 @@ for cv in range(N_FOLDS):
                     buffer_size=1000,
                     crop_size=input_size)
 
-    test_gt, test_prediction, test_time = model.test(test_dataset)
+    test_gt, test_prediction, test_time = utilities_models_tf.test(model, test_dataset)
     test_fold_summary[cv]={
             'ground_truth':np.argmax(test_gt.numpy(), axis=-1),
             'prediction':test_prediction.numpy(),
