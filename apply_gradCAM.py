@@ -56,7 +56,7 @@ args = vars(ap.parse_args())
 
 
 ## 1 load folders and information about the model
-model_path = '/flush/iulta54/Research/P3-THR_DL_refined/trained_models/LightOCT_anisotropic_with_augmentation_kernel7_flatten_batch200'
+model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/LightOCT_c2_isotropic_with_augmentation_batch800'
 # model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/M2_1_LeaveOneOut'
 fold = 1
 
@@ -90,50 +90,8 @@ with open(os.path.join(model_path,'train_val_test_filenames_json.txt')) as json_
         # this model has been trained using a tf generator
         gen_type = 'tf_gen'
 
-'''
-class descriptions
-class_0: unknown
-class_1: goiter
-class_2: normal
-class_3: adenoma
-class_4: cancer
-class_5: Graves
-class_6: Hashimoto
-
-Here we create dictionary with possible class combinations:
-1 - normal-vs-diseased classification
-2 - normal-vs-enlarged-vs-atrophic (3 class classification)
-3 - normal-vs-all-disease (6 class classification)
-'''
-classification_type_dict = {}
-
-classification_type_dict['1'] = {}
-classification_type_dict['1']['unique_labels'] = ['class_2',
-                 ['class_1','class_3','class_4','class_5','class_6']
-                 ]
-classification_type_dict['1']['class_labels'] = ['normal', 'disease']
-
-
-classification_type_dict['2'] = {}
-classification_type_dict['2']['unique_labels'] = ['class_2',
-                 'class_1',
-                 ['class_3','class_4','class_5','class_6']
-                 ]
-classification_type_dict['2']['class_labels'] = ['normal', 'enlarged', 'shrinked']
-
-classification_type_dict['3'] = {}
-classification_type_dict['3']['unique_labels'] = ['class_2',
-                 'class_1',
-                 'class_3',
-                 'class_4',
-                 'class_5',
-                 'class_6'
-                 ]
-classification_type_dict['3']['class_labels'] = ['normal', 'goiter', 'adenoma', 'cancer', 'Graves', 'Hashimoto']
-
 # create string that contains label description
-classification_type = '3'
-class_description = ', '.join([str(i+1)+'='+c for i, c in enumerate(classification_type_dict[classification_type]['class_labels'])])
+class_description = ', '.join([str(i)+'='+c for i, c in enumerate(class_labels)])
 
 # fix name of image_files
 if len(image_files[0]) > 50:
@@ -155,7 +113,7 @@ with open(os.path.join(model_path,'fold_'+str(fold), 'model_summary_json.txt')) 
 importlib.reload(utilities)
 
 seed = 29
-crop_size = (285,285) # (h, w)
+crop_size = (200,200) # (h, w)
 batch_size = 240
 
 seq = iaa.Sequential([
@@ -303,7 +261,6 @@ for i in range(images.shape[0]):
         heatmap_rgb[i].append(aus_rgb)
 print('Done.')
 
-##
 # start plotting
 for i in range(n_images):
     print('Creating figure {:3}/{:3} \r'.format(i+1, n_images), end='')
