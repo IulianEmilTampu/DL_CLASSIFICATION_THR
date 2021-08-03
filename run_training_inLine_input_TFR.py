@@ -414,9 +414,9 @@ for cv in range(N_FOLDS):
                     power = 0.3,
                     vae_kl_weight=vae_kl_weight,
                     vae_reconst_weight=vae_reconst_weight,
-                    max_epochs=35,
+                    max_epochs=200,
                     early_stopping=True,
-                    patience=10,
+                    patience=20,
                     save_model_path=os.path.join(save_model_path, 'fold_'+str(cv+1)),
                     save_model_architecture_figure=True if cv==0 else False,
                     )
@@ -427,9 +427,9 @@ for cv in range(N_FOLDS):
                     start_learning_rate = 0.001,
                     scheduler = 'polynomial',
                     power = 0.3,
-                    max_epochs=35,
+                    max_epochs=200,
                     early_stopping=True,
-                    patience=10,
+                    patience=20,
                     save_model_path=os.path.join(save_model_path, 'fold_'+str(cv+1)),
                     save_model_architecture_figure=True if cv==0 else False,
                     verbose=verbose
