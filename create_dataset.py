@@ -327,7 +327,7 @@ for key, value in files.items():
 
 ## convert anisotropic and isotropic volumes in 2D TFRecond datasets (make also a version where images are .nii.gz files)
 # ## randomly pick n volumes from each class and flag it as a test volume
-random.seed(29)
+random.seed(30)
 n_test_volumes_per_class = 2
 
 for key, value in files.items():
