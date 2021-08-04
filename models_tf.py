@@ -61,8 +61,8 @@ class LightOCT(object):
         if data_augmentation is True:
             augmentor = tf.keras.Sequential([
                     layers.experimental.preprocessing.Normalization(),
-                    layers.experimental.preprocessing.RandomFlip("horizontal"),
-                    layers.experimental.preprocessing.RandomRotation(0.1),
+                    layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+                    layers.experimental.preprocessing.RandomRotation(0.02),
                     layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
                     name='NormalizationAugmentationCropping')
         else: # perform only normalization
@@ -93,6 +93,7 @@ class LightOCT(object):
         # FCN
         # x = GlobalMaxPooling2D()(x)
         x = Flatten()(x)
+        # x = Dropout(rate=0.2)(x)
         final = Dense(units=self.num_classes, activation='softmax')(x)
 
         # save model paramenters
@@ -142,8 +143,8 @@ class M2(object):
         if data_augmentation is True:
             augmentor = tf.keras.Sequential([
                     layers.experimental.preprocessing.Normalization(),
-                    layers.experimental.preprocessing.RandomFlip("horizontal"),
-                    layers.experimental.preprocessing.RandomRotation(0.1)],
+                    layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+                    layers.experimental.preprocessing.RandomRotation(0.02)],
                     name='NormalizationAugmentation')
         else: # perform only normalization
             augmentor = tf.keras.Sequential([
@@ -214,8 +215,8 @@ class M3(object):
         if data_augmentation is True:
             augmentor = tf.keras.Sequential([
                     layers.experimental.preprocessing.Normalization(),
-                    layers.experimental.preprocessing.RandomFlip("horizontal"),
-                    layers.experimental.preprocessing.RandomRotation(0.1)],
+                    layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+                    layers.experimental.preprocessing.RandomRotation(0.02)],
                     name='NormalizationAugmentation')
         else: # perform only normalization
             augmentor = tf.keras.Sequential([
@@ -284,8 +285,8 @@ class ResNet50(object):
         if data_augmentation is True:
             augmentor = tf.keras.Sequential([
                     layers.experimental.preprocessing.Normalization(),
-                    layers.experimental.preprocessing.RandomFlip("horizontal"),
-                    layers.experimental.preprocessing.RandomRotation(0.1)],
+                    layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+                    layers.experimental.preprocessing.RandomRotation(0.02)],
                     name='NormalizationAugmentation')
         else: # perform only normalization
             augmentor = tf.keras.Sequential([
@@ -372,9 +373,9 @@ class VAE_original(object):
             augmentor = tf.keras.Sequential(
                 [
                     layers.experimental.preprocessing.Normalization(),
-                    layers.experimental.preprocessing.RandomFlip("horizontal"),
-                    layers.experimental.preprocessing.RandomRotation(0.1)
-                ], name='NormalizationAugmentation'
+                    layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+                    layers.experimental.preprocessing.RandomRotation(0.02)],
+                    name='NormalizationAugmentation'
             )
         else: # perform only normalization
             augmentor = tf.keras.Sequential([layers.experimental.preprocessing.Normalization()],name='Normalization')
@@ -549,9 +550,8 @@ class VAE1(object):
             augmentor = tf.keras.Sequential(
                 [
                     layers.experimental.preprocessing.Normalization(),
-                    layers.experimental.preprocessing.RandomFlip("horizontal"),
-                    layers.experimental.preprocessing.RandomRotation(0.1)
-                ], name='NormalizationAugmentation'
+                    layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+                    layers.experimental.preprocessing.RandomRotation(0.02)], name='NormalizationAugmentation'
             )
         else: # perform only normalization
             augmentor = tf.keras.Sequential([layers.experimental.preprocessing.Normalization()],name='Normalization')

@@ -10,6 +10,7 @@ import time
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import f1_score, recall_score, precision_score
 
 
 import tensorflow as tf
@@ -87,6 +88,18 @@ def accuracy(y_true, y_pred):
     total = tf.cast(tf.reduce_sum(y_true),dtype=tf.int64)
     return count/total
 
+def f1Score(y_true, y_pred):
+    '''
+    Computes the f1 score defined as:
+    f1-score = 2 * (Precision * Recall) / (Precision + Recall)
+
+    where
+    Precision = tp / (tp + fp)
+    Recall = tp / (tp + fn)
+    '''
+    return f1_score(tf.argmax(y_true, -1), tf.argmax(y_pred, -1))
+
+
 def plotModelPerformance(tr_loss, tr_acc, val_loss, val_acc, save_path, display=False):
     '''
     Saves training and validation curves.
@@ -120,6 +133,54 @@ def plotModelPerformance(tr_loss, tr_acc, val_loss, val_acc, save_path, display=
     ax1.legend(lns, labs, loc=7, fontsize=15)
 
     ax1.set_title('Training loss and accuracy trends', fontsize=20)
+    ax1.grid()
+    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+    fig.savefig(os.path.join(save_path, 'perfomance.pdf'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(save_path, 'perfomance.png'), bbox_inches='tight', dpi = 100)
+    plt.close()
+
+    if display is True:
+        plt.show()
+    else:
+        plt.close()
+
+def plotModelPerformance_v2(tr_loss, tr_acc, val_loss, val_acc, tr_f1, val_f1, save_path, display=False):
+    '''
+    Saves training and validation curves.
+    INPUTS
+    - tr_loss: training loss history
+    - tr_acc: training accuracy history
+    - tr_f1 : training f1-score history
+    - val_loss: validation loss history
+    - val_acc: validation accuracy history
+    - val_f1 : validation f1-score history
+    - save_path: path to where to save the model
+    '''
+
+    fig, ax1 = plt.subplots(figsize=(15, 10))
+    colors = ['blue', 'orange', 'green', 'red','pink','gray','purple','brown','olive','cyan','teal']
+    line_style = [':', '-.', '--', '-']
+    ax1.set_xlabel('Epochs', fontsize=15)
+    ax1.set_ylabel('Loss', fontsize=15)
+    l1 = ax1.plot(tr_loss, colors[0], ls=line_style[0])
+    l2 = ax1.plot(val_loss, colors[1], ls=line_style[1])
+    plt.legend(['Training loss', 'Validation loss'])
+
+    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+
+    ax2.set_ylabel('Accuracy and F1-score', fontsize=15)
+    ax2.set_ylim(bottom=0, top=1)
+    l3 = ax2.plot(tr_acc, colors[2], ls=line_style[2])
+    l4 = ax2.plot(val_acc, colors[3], ls=line_style[3])
+    l5 = ax2.plot(tr_f1, colors[4], ls=line_style[2])
+    l6 = ax2.plot(val_f1, colors[5], ls=line_style[3])
+
+    # add legend
+    lns = l1+l2+l3+l4+l5+l6
+    labs = ['Training loss', 'Validation loss', 'Training accuracy', 'Validation accuracy', 'Training F1-score', 'Validation F1-score']
+    ax1.legend(lns, labs, loc=7, fontsize=15)
+
+    ax1.set_title('Training loss, accuracy and F1-score trends', fontsize=20)
     ax1.grid()
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
     fig.savefig(os.path.join(save_path, 'perfomance.pdf'), bbox_inches='tight', dpi = 100)
@@ -225,7 +286,7 @@ def tictoc(tic=0, toc=1):
     # form a string in the format d:h:m:s
     return "%2dd:%02dh:%02dm:%02ds:%02dms" % (days, hours, minutes, seconds, milliseconds), dictionary
 
-def outsideTrain(self, training_dataloader,
+def train(self, training_dataloader,
                 validation_dataloader,
                 unique_labels,
                 loss=('cee'),
@@ -317,6 +378,7 @@ def outsideTrain(self, training_dataloader,
     # define parameters useful to store training and validation information
     self.train_loss_history, self.val_loss_history = [], []
     self.train_acc_history, self.val_acc_history = [], []
+    self.train_f1_history, self.val_f1_history = [], []
     self.initial_learning_rate = start_learning_rate
     self.scheduler = scheduler
     self.maxEpochs = max_epochs
@@ -342,6 +404,7 @@ def outsideTrain(self, training_dataloader,
 
     if early_stopping:
         self.best_acc = 0.0
+        self.best_f1 = 0.0
         n_wait = 0
 
     start = time.time()
@@ -350,9 +413,7 @@ def outsideTrain(self, training_dataloader,
         # initialize the variables
         epoch_train_loss, epoch_val_loss = [], []
         epoch_train_acc, epoch_val_acc = [], []
-
-        running_loss = 0.0
-        running_acc = 0.0
+        epoch_train_f1, epoch_val_f1 = [], []
 
         # compute learning rate based on the scheduler
         if self.scheduler == 'linear':
@@ -368,7 +429,7 @@ def outsideTrain(self, training_dataloader,
         # set optimizer - using ADAM by default
         optimizer = Adam(lr=lr)
 
-        # consume data from the dataloader
+        # ####### TRAINING
         step = 0
         for x, y in training_dataloader:
             step += 1
@@ -377,7 +438,7 @@ def outsideTrain(self, training_dataloader,
             x = x.numpy()
             y = fix_labels(y.numpy(), self.unique_labels)
 
-            # save information about training patch size
+            # save information about training image size
             if epoch == 0 and step == 1:
                 self.batch_size = x.shape[0]
                 self.input_size = (x.shape[1], x.shape[2])
@@ -387,7 +448,7 @@ def outsideTrain(self, training_dataloader,
             with tf.GradientTape() as tape:
                 # Logits for this minibatch
                 if 'VAE' in self.model_name:
-                    train_logits, reconstruction, augmented_norm, z_mean, z_log_var, z, = self.model(x, training=True)
+                    train_logits, reconstruction, augmented_norm, z_mean, z_log_var, z = self.model(x, training=True)
                 else:
                     train_logits = self.model(x, training=True)
 
@@ -438,13 +499,18 @@ def outsideTrain(self, training_dataloader,
             # save metrics
             epoch_train_loss.append(float(train_loss))
             train_acc = accuracy(y, train_logits)
+            train_f1 = f1Score(y, train_logits)
             epoch_train_acc.append(float(train_acc))
+            epoch_train_f1.append(float(train_f1))
 
             # Use the gradient tape to automatically retrieve
             # the gradients of the trainable variables with respect to the loss.
-            grads = tape.gradient(train_loss,
-                self.model.trainable_weights,
-                unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            if 'VAE' in self.model_name:
+                grads = tape.gradient(train_loss, self.model.trainable_weights,
+                                      unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            else:
+                grads = tape.gradient(train_loss, self.model.trainable_weights)
+
             # Run one step of gradient descent by updating
             # the value of the variables to minimize the loss.
             optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
@@ -453,24 +519,26 @@ def outsideTrain(self, training_dataloader,
             if self.verbose == 2:
                 if epoch == 0:
                     print('\r', end='')
-                    print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
-                            .format(epoch+1, step, train_loss, train_acc),end='')
+                    print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
+                            .format(epoch+1, step, train_loss, train_acc, train_f1),end='')
                 else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
                             .format(epoch+1,
                                     step,
                                     self.num_training_samples//self.batch_size,
                                     train_loss,
-                                    train_acc)
+                                    train_acc,
+                                    train_f1)
                             ,end='')
 
         # finisced all the training batches -> save training loss
         self.train_loss_history.append(np.mean(np.array(epoch_train_loss), axis=0))
         self.train_acc_history.append(np.mean(np.array(epoch_train_acc), axis=0))
+        self.train_f1_history.append(np.mean(np.array(epoch_train_f1), axis=0))
         if epoch == 0:
             self.num_training_samples = self.batch_size*step
 
-        # running validation loop
+        # ########### VALIDATION
         step = 0
         for x, y in validation_dataloader:
             step += 1
@@ -525,48 +593,62 @@ def outsideTrain(self, training_dataloader,
 
             epoch_val_loss.append(float(val_loss))
             val_acc = accuracy(y, val_logits)
+            val_f1 = f1Score(y, val_logits)
             epoch_val_acc.append(float(val_acc))
+            epoch_val_f1.append(float(val_f1))
 
             # print values
             if self.verbose == 2:
                 if epoch == 0:
                     print('\r', end='')
-                    print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, val_loss, val_acc),
+                    print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f} \r'
+                            .format(epoch+1, step, val_loss, val_acc, val_f1),
                             end='')
                 else:
-                    print('Epoch {:04d} validation-> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc),
+                    print('Epoch {:04d} validation -> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f} \r'
+                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc, val_f1),
                             end='')
 
 
         # finisced all the batches in the validation
         self.val_loss_history.append(np.mean(np.array(epoch_val_loss), axis=0))
         self.val_acc_history.append(np.mean(np.array(epoch_val_acc), axis=0))
+        self.val_f1_history.append(np.mean(np.array(epoch_val_f1), axis=0))
 
         if self.verbose == 1 or self.verbose == 2:
-            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}'.format(epoch+1,
+            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.04} {:10s}'.format(epoch+1,
                             self.train_loss_history[-1], self.train_acc_history[-1],
-                            self.val_loss_history[-1], self.val_acc_history[-1]))
+                            self.val_loss_history[-1], self.val_acc_history[-1],
+                            self.val_f1_history[-1],
+                            ''*10))
         if epoch == 0:
             self.num_validation_samples = self.batch_size*step
 
         if epoch % 2 == 0:
-            plotModelPerformance(self.train_loss_history,
+            # plotModelPerformance(self.train_loss_history,
+            #                         self.train_acc_history,
+            #                         self.val_loss_history,
+            #                         self.val_acc_history,
+            #                         self.save_model_path,
+            #                         display=False)
+
+            plotModelPerformance_v2(self.train_loss_history,
                                     self.train_acc_history,
                                     self.val_loss_history,
                                     self.val_acc_history,
+                                    self.train_f1_history,
+                                    self.val_f1_history,
                                     self.save_model_path,
                                     display=False)
 
             plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
 
             if 'VAE' in self.model_name:
-                plotVAEreconstruction(augmented_norm, reconstruction, epoch, self.save_model_path)
+                plotVAEreconstruction(augmented_norm.numpy(), reconstruction, epoch, self.save_model_path)
 
         if early_stopping:
             # check if model accurary improved, and update counter if needed
-            if self.val_acc_history[-1] > self.best_acc:
+            if self.val_f1_history[-1] > self.best_f1:
                 # save model checkpoint
                 if self.verbose == 1 or self.verbose == 2:
                     print(' - Saving model checkpoint in {}'.format(self.save_model_path))
@@ -577,6 +659,7 @@ def outsideTrain(self, training_dataloader,
                 # self.training_time = 1234
                 self.training_epochs = epoch
                 self.best_acc = self.val_acc_history[-1]
+                self.best_f1 = self.val_f1_history[-1]
 
                 # save model
                 save_model(self)
@@ -684,6 +767,8 @@ def save_model(self):
         'VALIDATION_LOSS_HISTORY':self.val_loss_history,
         'TRAIN_ACC_HISTORY':self.train_acc_history,
         'VALIDATION_ACC_HISTORY':self.val_acc_history,
+        'TRAIN_F1_HISTORY':self.train_f1_history,
+        'VALIDATION_F1_HISTORY':self.val_f1_history,
         'KL_LOSS_WEIGHT':self.vae_kl_weight if 'VAE' in self.model_name else None,
         'RECONSTRUCTION_LOSS_WEIGHT':self.vae_reconst_weight if 'VAE' in self.model_name else None,
         'VAE_LATENT_SPACE_DIM':self.vae_latent_dim if 'VAE' in self.model_name else None
