@@ -723,7 +723,7 @@ def show_batch_2D(sample_batched, title=''):
     Show sample image (z,x) for a batch of oct images.
     """
     batch_size = len(sample_batched[0])
-    nrows = batch_size//5
+    nrows = batch_size//10
     if batch_size%3 > 0:
         nrows += 1
 

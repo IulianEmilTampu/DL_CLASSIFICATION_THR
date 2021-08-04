@@ -64,7 +64,7 @@ random.shuffle(test_filenames)
 crop_size = (200,200) # (h, w)
 
 test_examples_to_show = 50
-train_examples_to_show = 100
+train_examples_to_show = 500
 
 ## create data augmentation layers
 
@@ -72,7 +72,7 @@ train_examples_to_show = 100
 augmentor = tf.keras.Sequential([
                 layers.experimental.preprocessing.Normalization(),
                 layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-                layers.experimental.preprocessing.RandomRotation(0.02, fill_mode='reflect', interpolation='nearest')],
+                layers.experimental.preprocessing.RandomRotation(0.02)],
             name='NormalizationAugmentationCropping')
 
 

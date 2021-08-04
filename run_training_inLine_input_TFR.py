@@ -282,10 +282,9 @@ print('Class weights -> {}'.format(class_weights))
 n_train = len(train_val_file_list)
 n_test = len(test_filenames)
 
-# get ready training dataGenerator
 # shuffle dataset
-seed = 29
-random.seed(seed)
+# seed = 29
+# random.seed(seed)
 random.shuffle(train_val_file_list)
 # train_val_file_list = train_val_file_list[0:1000]
 
@@ -413,7 +412,7 @@ for cv in range(N_FOLDS):
 
     # train model
     print(' - Training fold...')
-    utilities_models_tf.outsideTrain(model,
+    utilities_models_tf.train(model,
                     train_dataset, val_dataset,
                     unique_labels = unique_labels,
                     loss=[loss],
