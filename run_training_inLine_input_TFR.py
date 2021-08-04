@@ -416,7 +416,7 @@ for cv in range(N_FOLDS):
                     train_dataset, val_dataset,
                     unique_labels = unique_labels,
                     loss=[loss],
-                    start_learning_rate = 0.001,
+                    start_learning_rate = learning_rate,
                     scheduler = 'polynomial',
                     power = 0.3,
                     vae_kl_weight=vae_kl_weight,

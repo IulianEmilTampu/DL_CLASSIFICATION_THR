@@ -97,7 +97,7 @@ def f1Score(y_true, y_pred):
     Precision = tp / (tp + fp)
     Recall = tp / (tp + fn)
     '''
-    return f1_score(tf.argmax(y_true, -1), tf.argmax(y_pred, -1))
+    return f1_score(tf.argmax(y_true, -1), tf.argmax(y_pred, -1), average='macro')
 
 
 def plotModelPerformance(tr_loss, tr_acc, val_loss, val_acc, save_path, display=False):
