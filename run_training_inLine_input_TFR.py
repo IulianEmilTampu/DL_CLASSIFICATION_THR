@@ -58,6 +58,7 @@ parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension 
 parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in for the VAE loss', default=0.1)
 parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconstruction weight in for the VAE loss', default=0.1)
 parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
+parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
 args = parser.parse_args()
 
 # parse variables
@@ -76,6 +77,7 @@ vae_kl_weight = float(args.vae_kl_weight)
 vae_reconst_weight = float(args.vae_reconst_weight)
 N_FOLDS = int(args.folds)
 verbose = int(args.verbose)
+imbalance_data_strategy = args.imbalance_data_strategy
 
 # check if working folder and dataset folder exist
 if os.path.isdir(working_folder):
@@ -234,6 +236,7 @@ print('Class labels {}'.format(class_labels))
 train_val_file_list = []
 test_filenames = []
 class_weights = np.zeros(len(unique_labels))
+
 per_class_training_file_list = {}
 
 for idx1, c in enumerate(unique_labels):
@@ -251,22 +254,27 @@ for idx1, c in enumerate(unique_labels):
         test_filenames.extend(glob.glob(os.path.join(test_folder, c,'*.tfrecords')))
         per_class_training_file_list[idx1] = glob.glob(os.path.join(train_folder, c,'*.tfrecords'))
 
-# get the class with highest number of elements
-better_represented_class = np.argmax(class_weights)
-num_sample_to_eversample = [class_weights[better_represented_class] - len(value) for key, value in per_class_training_file_list.items()]
+print('Using {} strategy to handle imbalance data.'.format(imbalance_data_strategy))
+if imbalance_data_strategy == 'oversampling':
+    # get the class with highest number of elements
+    better_represented_class = np.argmax(class_weights)
+    num_sample_to_eversample = [class_weights[better_represented_class] - len(value) for key, value in per_class_training_file_list.items()]
 
-# sample where needed and add to the training file names
-for idx, i in enumerate(num_sample_to_eversample):
-    # only oversample where is needed
-    if i != 0:
-        n_class_samples = len(per_class_training_file_list[idx])
-        train_val_file_list.extend(per_class_training_file_list[idx]*int(i // n_class_samples))
-        train_val_file_list.extend(random.sample(per_class_training_file_list[idx], int(i % n_class_samples)))
+    # sample where needed and add to the training file names
+    for idx, i in enumerate(num_sample_to_eversample):
+        # only oversample where is needed
+        if i != 0:
+            n_class_samples = len(per_class_training_file_list[idx])
+            train_val_file_list.extend(per_class_training_file_list[idx]*int(i // n_class_samples))
+            train_val_file_list.extend(random.sample(per_class_training_file_list[idx], int(i % n_class_samples)))
 
-class_weights = class_weights.sum() / class_weights**1
-class_weights = class_weights / class_weights.sum()
-class_weights = np.ones(len(unique_labels))
-print('Using over-sampling strategy.')
+    class_weights = np.ones(len(unique_labels))
+    print('Setting loss function to cce given the oversampling strategy')
+    loss = 'cce'
+elif imbalance_data_strategy == 'weights':
+    class_weights = class_weights.sum() / class_weights**1
+    class_weights = class_weights / class_weights.sum()
+
 print('Class weights -> {}'.format(class_weights))
 
 ## prepare for cross validation
