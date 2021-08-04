@@ -562,7 +562,7 @@ def outsideTrain(self, training_dataloader,
             plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
 
             if 'VAE' in self.model_name:
-                plotVAEreconstruction(x, reconstruction, epoch, self.save_model_path)
+                plotVAEreconstruction(augmented_norm, reconstruction, epoch, self.save_model_path)
 
         if early_stopping:
             # check if model accurary improved, and update counter if needed

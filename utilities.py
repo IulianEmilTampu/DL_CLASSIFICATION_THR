@@ -718,12 +718,12 @@ def plotPR(GT, PRED, classes, savePath=None, draw=False):
 ## PLOTTING
 
 # Helper function to show a batch
-def show_batch_2D(sample_batched):
+def show_batch_2D(sample_batched, title=''):
     """
     Show sample image (z,x) for a batch of oct images.
     """
     batch_size = len(sample_batched[0])
-    nrows = batch_size//3
+    nrows = batch_size//5
     if batch_size%3 > 0:
         nrows += 1
 

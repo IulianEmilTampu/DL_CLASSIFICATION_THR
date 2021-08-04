@@ -340,7 +340,7 @@ for cv in range(N_FOLDS):
     train_dataset = utilities.TFR_2D_dataset(X_train,
                     dataset_type = 'train',
                     batch_size=batch_size,
-                    buffer_size=1000,
+                    buffer_size=5000,
                     crop_size=input_size)
 
     val_dataset = utilities.TFR_2D_dataset(X_val,
