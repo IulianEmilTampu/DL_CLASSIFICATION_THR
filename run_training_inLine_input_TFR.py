@@ -279,7 +279,7 @@ n_test = len(test_filenames)
 seed = 29
 random.seed(seed)
 random.shuffle(train_val_file_list)
-train_val_file_list = train_val_file_list[0:1000]
+# train_val_file_list = train_val_file_list[0:1000]
 
 # cross-validation split
 kf = KFold(n_splits=N_FOLDS)
@@ -414,9 +414,9 @@ for cv in range(N_FOLDS):
                     power = 0.3,
                     vae_kl_weight=vae_kl_weight,
                     vae_reconst_weight=vae_reconst_weight,
-                    max_epochs=3,
+                    max_epochs=200,
                     early_stopping=True,
-                    patience=10,
+                    patience=20,
                     save_model_path=os.path.join(save_model_path, 'fold_'+str(cv+1)),
                     save_model_architecture_figure=True if cv==0 else False,
                     verbose=verbose
