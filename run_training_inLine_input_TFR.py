@@ -400,6 +400,24 @@ for cv in range(N_FOLDS):
                         kernel_size=(5,5),
                         input_size=input_size
                         )
+    elif model_configuration == 'VAE2':
+        model = models_tf.VAE2(number_of_input_channels = 1,
+                        model_name='VAE2',
+                        num_classes = len(unique_labels),
+                        data_augmentation=data_augmentation,
+                        class_weights = class_weights,
+                        kernel_size=(5,5),
+                        input_size=input_size
+                        )
+    elif model_configuration == 'VAE3':
+        model = models_tf.VAE3(number_of_input_channels = 1,
+                        model_name='VAE3',
+                        num_classes = len(unique_labels),
+                        data_augmentation=data_augmentation,
+                        class_weights = class_weights,
+                        kernel_size=(5,5),
+                        input_size=input_size
+                        )
     else:
         model = models_tf.LightOCT(number_of_input_channels = 1,
                         model_name='LightOCT',
@@ -423,7 +441,7 @@ for cv in range(N_FOLDS):
                     vae_reconst_weight=vae_reconst_weight,
                     max_epochs=200,
                     early_stopping=True,
-                    patience=20,
+                    patience=10,
                     save_model_path=os.path.join(save_model_path, 'fold_'+str(cv+1)),
                     save_model_architecture_figure=True if cv==0 else False,
                     verbose=verbose
