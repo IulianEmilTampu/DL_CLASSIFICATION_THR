@@ -478,7 +478,7 @@ Saving overall cross validation test results and images:
 - Precision-Recall curve
 
 - test summary file with the prediction for every test image (test_summary.txt)
-    Here add also the inforlation needed to re-plot the ROC and PP curves (fpr,
+    Here add also the information needed to re-plot the ROC and PP curves (fpr,
     tpr, roc_auc, precision and recall - micro and macro average)
     The test_summary.txt file is a dictionary with the following entries:
     - model_name: string
