@@ -53,6 +53,7 @@ parser.add_argument('-l', '--loss', required=False, help='Loss to use to train t
 parser.add_argument('-lr', '--learning_rate', required=False, help='Learning rate.', default=0.001)
 parser.add_argument('-bs', '--batch_size', required=False, help='Batch size.', default=50)
 parser.add_argument('-is', '--input_size', nargs='+', required=False, help='Model input size.', default=(200,200))
+parser.add_argument('-ks', '--kernel_size', nargs='+', required=False, help='Encoder conv kernel size.', default=(5,5))
 parser.add_argument('-augment', '--augmentation', required=False, help='Specify if data augmentation is to be performed (True) or not (False)', default=True)
 parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension of the VAE latent space', default=128)
 parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in for the VAE loss', default=0.1)
@@ -78,6 +79,7 @@ vae_reconst_weight = float(args.vae_reconst_weight)
 N_FOLDS = int(args.folds)
 verbose = int(args.verbose)
 imbalance_data_strategy = args.imbalance_data_strategy
+kernel_size = [int(i) for i in args.kernel_size]
 
 # check if working folder and dataset folder exist
 if os.path.isdir(working_folder):
@@ -355,7 +357,7 @@ for cv in range(N_FOLDS):
                         num_classes = len(unique_labels),
                         data_augmentation=data_augmentation,
                         class_weights = class_weights,
-                        kernel_size=(5,5),
+                        kernel_size=kernel_size,
                         input_size=input_size
                         )
     elif model_configuration == 'M2':
@@ -364,7 +366,7 @@ for cv in range(N_FOLDS):
                         num_classes = len(unique_labels),
                         data_augmentation=data_augmentation,
                         class_weights = class_weights,
-                        kernel_size=(5,5)
+                        kernel_size=kernel_size
                         )
     elif model_configuration == 'M3':
         model = models_tf.M3(number_of_input_channels = 1,
@@ -372,7 +374,7 @@ for cv in range(N_FOLDS):
                         num_classes = len(unique_labels),
                         data_augmentation=data_augmentation,
                         class_weights = class_weights,
-                        kernel_size=(5,5)
+                        kernel_size=kernel_size
                         )
     elif model_configuration == 'ResNet50':
         model = models_tf.ResNet50(number_of_input_channels = 1,
@@ -387,7 +389,7 @@ for cv in range(N_FOLDS):
                         num_classes = len(unique_labels),
                         data_augmentation=data_augmentation,
                         class_weights = class_weights,
-                        kernel_size=(5,5),
+                        kernel_size=kernel_size,
                         input_size=input_size,
                         vae_latent_dim=vae_latent_dim
                         )
@@ -397,7 +399,7 @@ for cv in range(N_FOLDS):
                         num_classes = len(unique_labels),
                         data_augmentation=data_augmentation,
                         class_weights = class_weights,
-                        kernel_size=(5,5),
+                        kernel_size=kernel_size,
                         input_size=input_size
                         )
     elif model_configuration == 'VAE2':
@@ -415,7 +417,7 @@ for cv in range(N_FOLDS):
                         num_classes = len(unique_labels),
                         data_augmentation=data_augmentation,
                         class_weights = class_weights,
-                        kernel_size=(5,5),
+                        kernel_size=kernel_size,
                         input_size=input_size
                         )
     else:
@@ -424,7 +426,7 @@ for cv in range(N_FOLDS):
                         num_classes = len(unique_labels),
                         data_augmentation=data_augmentation,
                         class_weights = class_weights,
-                        kernel_size=(5,5),
+                        kernel_size=kernel_size,
                         input_size=input_size
                         )
 
