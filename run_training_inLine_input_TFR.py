@@ -383,6 +383,14 @@ for cv in range(N_FOLDS):
                         data_augmentation=data_augmentation,
                         class_weights = class_weights
                         )
+    elif model_configuration == 'InceptionV3':
+        model = models_tf.InceptionV3(number_of_input_channels = 1,
+                        model_name='InceptionV3',
+                        num_classes = len(unique_labels),
+                        data_augmentation=data_augmentation,
+                        class_weights = class_weights,
+                        input_size=input_size
+                        )
     elif model_configuration == 'VAE_original':
         model = models_tf.VAE_original(number_of_input_channels = 1,
                         model_name='VAE_original',

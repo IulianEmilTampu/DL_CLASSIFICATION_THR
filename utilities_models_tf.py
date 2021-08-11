@@ -27,7 +27,7 @@ def fix_labels(labels, unique_labels, categorical=True):
     Args:
     labels: numpy array containing the labels
     unique_labels (list): list of the wanted labels and their organization
-        For example:
+        # For example:
         [
         'class_0',
         ['class_1', 'class_3'],

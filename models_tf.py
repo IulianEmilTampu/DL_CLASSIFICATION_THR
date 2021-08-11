@@ -256,7 +256,7 @@ class M3(object):
         if self.debug is True:
             print(self.model.summary())
 
-## CUSTOM MODEL ResNet50
+## ResNet50
 
 class ResNet50(object):
     '''
@@ -315,6 +315,70 @@ class ResNet50(object):
 
         # finally make the model and return
         self.model = Model(inputs=inputs, outputs=final, name=model_name)
+
+        # print model if needed
+        if self.debug is True:
+            print(self.model.summary())
+
+
+## Inception_v3
+
+class InceptionV3(object):
+    '''
+    Imports the InceptionV3 architecture available in tensorflow.
+    The FCN is made by a dense layer of 60 nodes with ReLU activation and dropout, and final softmax.
+    '''
+    def __init__(self, number_of_input_channels,
+                    num_classes,
+                    input_size,
+                    data_augmentation=True,
+                    class_weights=None,
+                    model_name='InceptionV3',
+                    debug=False):
+
+        self.number_of_input_channels = number_of_input_channels
+        self.num_classes = num_classes
+        self.debug = debug
+        if class_weights is None:
+            self.class_weights = np.ones([1, self.num_classes])
+        else:
+            self.class_weights = class_weights
+        self.model_name = model_name
+
+        inputs = Input(shape=[None, None, self.number_of_input_channels])
+
+        # Create a data augmentation stage with normalization, horizontal flipping and rotations
+        if data_augmentation is True:
+            augmentor = tf.keras.Sequential([
+                    layers.experimental.preprocessing.Normalization(),
+                    layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+                    layers.experimental.preprocessing.RandomRotation(0.02),
+                    layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
+                    name='NormalizationAugmentationCropping')
+        else: # perform only normalization
+            augmentor = tf.keras.Sequential([
+                    layers.experimental.preprocessing.Normalization(),
+                    layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
+                    name='NormalizationCrop')
+
+        x = augmentor(inputs)
+
+        # import model
+        inception = tf.keras.applications.inception_v3.InceptionV3(include_top=True,
+                                classes=self.num_classes,
+                                weights=None,
+                                input_tensor=x,
+                                input_shape=(input_size[0], input_size[0], self.number_of_input_channels))
+
+        # save model paramenters
+        self.num_filter_start = 'Inception'
+        self.kernel_size = 'Inception'
+        self.depth = 'Inception'
+        self.num_filter_per_layer = 'Inception'
+        self.custom_model = False
+
+        # finally make the model and return
+        self.model = Model(inputs=inputs, outputs=inception.output, name=model_name)
 
         # print model if needed
         if self.debug is True:
