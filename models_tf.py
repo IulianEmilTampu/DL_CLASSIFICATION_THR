@@ -307,10 +307,10 @@ class ResNet50(object):
         final = Dense(units=self.num_classes, activation='softmax')(x)
 
         # save model paramenters
-        self.num_filter_start = 64
-        self.kernel_size = (3,3)
+        self.num_filter_start = 'ResNet50'
+        self.kernel_size = 'ResNet50'
         self.depth = 50
-        self.num_filter_per_layer = [64, 64, 256, 64, 64, 256, 64, 64, 256, 128, 128, 512, 128, 128, 512, 128, 128, 512, 128, 128, 512, 256, 256, 1024, 256, 256, 1024, 256, 256, 1024, 256, 256, 1024, 256, 256, 1024, 256, 256, 1024, 512, 512, 2048, 512, 512, 2048, 512, 512, 2048]
+        self.num_filter_per_layer = 'ResNet50'
         self.custom_model = False
 
         # finally make the model and return
@@ -373,7 +373,7 @@ class InceptionV3(object):
         # save model paramenters
         self.num_filter_start = 'Inception'
         self.kernel_size = 'Inception'
-        self.depth = 'Inception'
+        self.depth = 159
         self.num_filter_per_layer = 'Inception'
         self.custom_model = False
 
