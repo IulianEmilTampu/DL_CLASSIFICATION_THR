@@ -54,8 +54,8 @@ base_folder = '/flush/iulta54/Research/P3-THR_DL/trained_models'
 # dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019/2D_classification_dataset_LeaveOneOut_per_class_organization/Test'
 
 dataset_path = {
-    'pytorch_gen':'/flush/iulta54/Research/Data/OCT/Thyroid/2D_classification_dataset_LeaveOneOut_anisotropic_per_class_organization/Test',
-    'tf_gen': '/flush/iulta54/Research/Data/OCT/Thyroid/2D_classification_dataset_LeaveOneOut_anisotropic_per_class_organization_TFR/Test'}
+    'pytorch_gen':'/flush/iulta54/Research/Data/OCT/Thyroid/2D_classification_anisotropic/Test',
+    'tf_gen': '/flush/iulta54/Research/Data/OCT/Thyroid/2D_classification_dataset_isotropic_TFR/Test'}
 
 # here specify which model or models to test
 
@@ -88,8 +88,10 @@ dataset_path = {
 # model_description = ['VAE']
 
 # ¤¤¤¤¤¤¤¤¤¤¤¤¤
-model = ['M1_3_LeaveOneOut_anisotropic_wcce_TFR', 'M2_3_LeaveOneOut_anisotropic_wcce_TFR', 'M3_3_LeaveOneOut_anisotropic_wcce_TFR', 'VAE_3_TFR']
-model_description = ['M1', 'M2', 'M3', 'M4']
+model = ['LightOCT_c3_isotropic_wa_lr0001_batch400', 'ResNet50_c3_isotropic_wa_lr0001_batch50', 'VAE_original_c3_isotropic_wa_lsd128']
+
+model_description = ['LightOCT', 'ResNet50', 'VAE_original']
+
 
 
 
@@ -144,7 +146,7 @@ for m in range(len(model)):
 
 # general generator imformation
 seed = 29
-crop_size = (250,250) # (h, w)
+crop_size = (200,200) # (h, w)
 batch_size = 64
 
 seq = iaa.Sequential([
@@ -232,80 +234,80 @@ for m in range(len(models)):
         print(' - classification of {} images took {} for this model'.format(len(folds_test_values[0]), test_time))
     else:
         print('test_summary file not found. Running test now...')
-        aus_prediction_database = []
-
-        # create generator based on model specifications
-        if models[m]['gen_type'] == 'pytorch_gen':
-            test_dataset = utilities.OCTDataset2D_classification(models[m]['test_files'],
-                    models[m]['unique_labels'],
-                    transform=transformer,
-                    augmentor=seq)
-            test_dataset = DataLoader(test_dataset, batch_size=batch_size,
-                                    shuffle=False, num_workers=0, pin_memory=True)
-        elif models[m]['gen_type'] == 'tf_gen':
-            test_dataset = utilities.TFR_2D_dataset(models[m]['test_files'],
-                            dataset_type = 'test',
-                            batch_size=batch_size,
-                            buffer_size=1000,
-                            crop_size=(crop_size[0], crop_size[1]))
-
-        for cv in range(models[m]['num_folds']):
-            print(' - runing predictions on fold {}/{}'.format(cv+1, num_folds))
-            # load model
-            model_path = os.path.join(base_folder, models[m]['model'], 'fold_'+ str(cv+1), 'model')
-            if os.path.exists(model_path + '.h5'):
-                model_path = model_path + '.h5'
-            elif os.path.exists(model_path + '.tf'):
-                model_path = model_path + '.tf'
-            else:
-                raise Exception('Model not found')
-
-            model = load_model(model_path, compile=False)
-            # run through all the images in the test dataset
-            aus_pred = []
-            aus_gt = []
-            for im, label in test_dataset:
-                im = im.numpy()
-                pred = model(im)
-                if type(pred) is list:
-                    # the model is a VEA, taking only the prediction
-                    pred = pred[4].numpy().tolist()
-                else:
-                    pred = pred.numpy().tolist()
-
-                if models[m]['gen_type'] == 'tf_gen':
-                    # need to fix the labels here based on the unique label information
-                    label = utilities.fix_labels(label.numpy(),
-                                            models[m]['unique_labels'],
-                                            categorical=False)
-
-                aus_pred.extend(pred)
-                aus_gt.extend(label)
-            # save predictions and gts
-            prediction_database[m].append(np.array(aus_pred))
-            aus_prediction_database.append(aus_pred)
-
-            if m == 0:
-                gt = np.array(aus_gt)
-        # print classification time for the model
-        toc = time.time()
-        print(' - classification of {} images took {} for this model'.format(len(image_files), utilities.tictoc(tic,toc)))
-
-        # save test summary
-        print(' - Saving test summary...')
-
-        json_dict = OrderedDict()
-        json_dict['model_name'] = models[m]['model']
-        json_dict['labels'] = [int(i) for i in aus_gt]
-        json_dict['folds_test_values'] = aus_prediction_database
-        json_dict['test_time'] = utilities.tictoc(tic,toc)
-        json_dict['test_date'] = time.strftime("%Y%m%d-%H%M%S")
-        with open(os.path.join(base_folder, models[m]['model'],'test_summary.txt'), 'w') as fp:
-            json.dump(json_dict, fp)
-
-        # delete some variables
-        del test_dataset
-        del model
+        # aus_prediction_database = []
+        #
+        # # create generator based on model specifications
+        # if models[m]['gen_type'] == 'pytorch_gen':
+        #     test_dataset = utilities.OCTDataset2D_classification(models[m]['test_files'],
+        #             models[m]['unique_labels'],
+        #             transform=transformer,
+        #             augmentor=seq)
+        #     test_dataset = DataLoader(test_dataset, batch_size=batch_size,
+        #                             shuffle=False, num_workers=0, pin_memory=True)
+        # elif models[m]['gen_type'] == 'tf_gen':
+        #     test_dataset = utilities.TFR_2D_dataset(models[m]['test_files'],
+        #                     dataset_type = 'test',
+        #                     batch_size=batch_size,
+        #                     buffer_size=1000,
+        #                     crop_size=(crop_size[0], crop_size[1]))
+        #
+        # for cv in range(models[m]['num_folds']):
+        #     print(' - runing predictions on fold {}/{}'.format(cv+1, num_folds))
+        #     # load model
+        #     model_path = os.path.join(base_folder, models[m]['model'], 'fold_'+ str(cv+1), 'model')
+        #     if os.path.exists(model_path + '.h5'):
+        #         model_path = model_path + '.h5'
+        #     elif os.path.exists(model_path + '.tf'):
+        #         model_path = model_path + '.tf'
+        #     else:
+        #         raise Exception('Model not found')
+        #
+        #     model = load_model(model_path, compile=False)
+        #     # run through all the images in the test dataset
+        #     aus_pred = []
+        #     aus_gt = []
+        #     for im, label in test_dataset:
+        #         im = im.numpy()
+        #         pred = model(im)
+        #         if type(pred) is list:
+        #             # the model is a VEA, taking only the prediction
+        #             pred = pred[4].numpy().tolist()
+        #         else:
+        #             pred = pred.numpy().tolist()
+        #
+        #         if models[m]['gen_type'] == 'tf_gen':
+        #             # need to fix the labels here based on the unique label information
+        #             label = utilities.fix_labels(label.numpy(),
+        #                                     models[m]['unique_labels'],
+        #                                     categorical=False)
+        #
+        #         aus_pred.extend(pred)
+        #         aus_gt.extend(label)
+        #     # save predictions and gts
+        #     prediction_database[m].append(np.array(aus_pred))
+        #     aus_prediction_database.append(aus_pred)
+        #
+        #     if m == 0:
+        #         gt = np.array(aus_gt)
+        # # print classification time for the model
+        # toc = time.time()
+        # print(' - classification of {} images took {} for this model'.format(len(image_files), utilities.tictoc(tic,toc)))
+        #
+        # # save test summary
+        # print(' - Saving test summary...')
+        #
+        # json_dict = OrderedDict()
+        # json_dict['model_name'] = models[m]['model']
+        # json_dict['labels'] = [int(i) for i in aus_gt]
+        # json_dict['folds_test_values'] = aus_prediction_database
+        # json_dict['test_time'] = utilities.tictoc(tic,toc)
+        # json_dict['test_date'] = time.strftime("%Y%m%d-%H%M%S")
+        # with open(os.path.join(base_folder, models[m]['model'],'test_summary.txt'), 'w') as fp:
+        #     json.dump(json_dict, fp)
+        #
+        # # delete some variables
+        # del test_dataset
+        # del model
 
 gt_backup = gt
 
@@ -316,6 +318,7 @@ ensemble_pred_logits = []
 
 debug = False
 dummy = False
+save = False
 
 for idx, m in enumerate(models):
     # compute ensemble
@@ -353,7 +356,10 @@ for idx, m in enumerate(models):
 
 
     # save confusion matrix
-    acc = utilities.plotConfusionMatrix(gt, aus_ensemble_pred, classes=class_labels, savePath=save_path, draw=True)
+    if save is True:
+        acc = utilities.plotConfusionMatrix(gt, aus_ensemble_pred, classes=class_labels, savePath=save_path, draw=True)
+    else:
+        acc = utilities.plotConfusionMatrix(gt, aus_ensemble_pred, classes=class_labels, savePath=None, draw=True)
     # print accuracy for reference
     print('Model {} -> accuracy {:02.4}'.format(m['model'], acc))
 plt.show()
@@ -376,7 +382,7 @@ from sklearn.metrics import roc_curve, auc
 from itertools import cycle
 from scipy import interp
 
-save = True
+save = False
 
 # Compute ROC curve and ROC area for each class
 fpr = dict()
@@ -446,7 +452,7 @@ for idx, m1 in enumerate(models):
     ax.set_ylim([0.0, 1.0])
     ax.set_xlabel('False Positive Rate', fontsize=25)
     ax.set_ylabel('True Positive Rate', fontsize=25)
-    ax.set_title('Model {} - multi-class ROC (OneVsAll)'.format(m), fontsize=20)
+    ax.set_title('Model {} (OneVsAll)'.format(model_description[idx]), fontsize=20)
     plt.legend(loc="lower right", fontsize=12)
 
     # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤ work on the zummed-in image
@@ -505,7 +511,7 @@ from sklearn.metrics import average_precision_score
 from itertools import cycle
 from scipy import interp
 
-save = True
+save = False
 #line width
 lw = 2
 
@@ -570,7 +576,7 @@ for idx, m1 in enumerate(models):
     ax.set_ylim([0.0, 1.0])
     ax.set_xlabel('True positive rate - Recall [TP/(TP+FN)]', fontsize=20)
     ax.set_ylabel('Positive predicted value - Precision [TP/(TP+TN)]', fontsize=20)
-    ax.set_title('Model {} - multi-class Precision-recall curve'.format(m), fontsize=20)
+    ax.set_title('Model {} '.format(model_description[idx]), fontsize=20)
     plt.legend(loc="lower right", fontsize=12)
 
     plt.draw()
@@ -637,23 +643,24 @@ colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray',
 fig, ax = plt.subplots(figsize=(10,10))
 for m, color in zip(range(len(models)), colors):
     ax.plot(fpr[models[m]['model']]['micro'], tpr[models[m]['model']]['micro'], color=color, lw=lw,
-            label='Model {} (area = {:0.2f})'.format(models[m]['model'], roc_auc[models[m]['model']]['micro']))
+            label=f"Model {model_description[m]:{np.max([len(x) for x in model_description])}s} (area = {roc_auc[models[m]['model']]['micro']:0.2f})")
 
 ax.plot([0, 1], [0, 1], 'k--', lw=lw)
 ax.set_xlim([0.0, 1.0])
-ax.set_ylim([0.0, 1.05])
+ax.set_ylim([0.0, 1.0])
+ax.tick_params(labelsize=20)
+
 # plt.grid('minor')
-ax.set_xlabel('False Positive Rate')
-ax.set_ylabel('True Positive Rate')
-ax.set_title('Comparison multi-class ROC (OneVsAll) - micro-average')
-plt.legend(loc="lower right")
+ax.set_xlabel('False Positive Rate', fontsize=25)
+ax.set_ylabel('True Positive Rate', fontsize=25)
+ax.set_title('Comparison multi-class ROC (OneVsAll) - micro-average', fontsize=20)
+plt.legend(loc="lower right", fontsize=16)
 
 # ¤¤¤¤¤¤¤¤ work on the zoom-in
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
 axins = zoomed_inset_axes(ax, zoom=1, loc=7, bbox_to_anchor=(0,0,0.99,0.9), bbox_transform=ax.transAxes)
 for m, color in zip(range(len(models)), colors):
-    axins.plot(fpr[models[m]['model']]['micro'], tpr[models[m]['model']]['micro'], color=color, lw=lw,
-            label='Model {} (area = {:0.2f})'.format(models[m]['model'], roc_auc[models[m]['model']]['micro']))
+    axins.plot(fpr[models[m]['model']]['micro'], tpr[models[m]['model']]['micro'], color=color, lw=lw)
 
 # sub region of the original image
 x1, x2, y1, y2 = 0.0, 0.3, 0.7, 1.0
@@ -669,9 +676,11 @@ mark_inset(ax, axins, loc1=1, loc2=3, fc='none', ec='0.5', ls='--')
 
 plt.draw()
 if save is True:
-    fig.savefig(os.path.join(base_folder, 'Model_comparison_multiclass_ROC_micro_avg_'+datetime.now().strftime("%H:%M:%S")+'.pdf'), bbox_inches='tight', dpi = 100)
-    fig.savefig(os.path.join(base_folder, 'Model_comparison_multiclass_ROC_micro_avg_'+datetime.now().strftime("%H:%M:%S")+'.png'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(base_folder, f'Model_comparison_micro_avg_{datetime.now().strftime("%H:%M:%S")}.pdf'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(base_folder, f'Model_comparison_micro_avg_{datetime.now().strftime("%H:%M:%S")}.png'), bbox_inches='tight', dpi = 100)
     plt.close()
+else:
+    plt.show()
 
 # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤ macro average
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
@@ -679,29 +688,29 @@ line_style = cycle([':', '-.', '-'])
 fig, ax = plt.subplots(figsize=(10,10))
 for m, color, ls in zip(range(len(models)), colors, line_style):
     ax.plot(fpr[models[m]['model']]['macro'], tpr[models[m]['model']]['macro'], color=color, lw=lw, ls=ls,
-            label='Model {} (area = {:0.2f})'.format(models[m]['model'], roc_auc[models[m]['model']]['macro']))
+            label=f"Model {model_description[m]:{np.max([len(x) for x in model_description])}s} (area = {roc_auc[models[m]['model']]['macro']:0.2f})")
 
 ax.plot([0, 1], [0, 1], 'k--', lw=lw)
 ax.set_xlim([0.0, 1.0])
-ax.set_ylim([0.0, 1.05])
+ax.set_ylim([0.0, 1.0])
 # plt.grid('minor')
 ax.set_xlabel('False Positive Rate', fontsize=25)
 ax.set_ylabel('True Positive Rate', fontsize=25)
-ax.set_title('Comparison multi-class ROC (OneVsAll) - macro-average', fontsize=20)
-plt.legend(loc="lower right", fontsize=12)
+ax.set_title('Comparison between models - macro-average', fontsize=20)
+plt.legend(loc="lower right", fontsize=20)
 
 # ¤¤¤¤¤¤¤¤ work on the zoom-in
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
 line_style = cycle([':', '-.', '-'])
 axins = zoomed_inset_axes(ax, zoom=1, loc=7, bbox_to_anchor=(0,0,0.99,0.9), bbox_transform=ax.transAxes)
 for m, color, ls in zip(range(len(models)), colors, line_style):
-    axins.plot(fpr[models[m]['model']]['macro'], tpr[models[m]['model']]['macro'], color=color, lw=lw, ls=ls,
-            label='Model {} (area = {:0.2f})'.format(models[m]['model'], roc_auc[models[m]['model']]['macro']))
+    axins.plot(fpr[models[m]['model']]['macro'], tpr[models[m]['model']]['macro'], color=color, lw=lw, ls=ls)
 
 # sub region of the original image
 x1, x2, y1, y2 = 0.0, 0.3, 0.7, 1.0
 axins.set_xlim(x1, x2)
 axins.set_ylim(y1, y2)
+ax.tick_params(labelsize=20)
 
 axins.set_xticks(np.linspace(x1, x2, 4))
 axins.set_yticks(np.linspace(y1, y2, 4))
@@ -711,11 +720,8 @@ axins.set_yticks(np.linspace(y1, y2, 4))
 mark_inset(ax, axins, loc1=1, loc2=3, fc='none', ec='0.5', ls='--')
 
 if save is True:
-    fig.savefig(os.path.join(base_folder, 'Model_comparison_multiclass_ROC_macro_avg_'+datetime.now().strftime("%H:%M:%S")+'.pdf'), bbox_inches='tight', dpi = 100)
-    fig.savefig(os.path.join(base_folder, 'Model_comparison_multiclass_ROC_macro_avg_'+datetime.now().strftime("%H:%M:%S")+'.png'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(base_folder, f'Model_comparison_macro_avg_{datetime.now().strftime("%H:%M:%S")}.pdf'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(base_folder, f'Model_comparison_macro_avg_{datetime.now().strftime("%H:%M:%S")}.png'), bbox_inches='tight', dpi = 100)
     plt.close()
 else:
     plt.show()
-
-
-
