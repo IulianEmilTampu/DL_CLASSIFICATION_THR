@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 # Where the trained models are saved
-trained_models/
+trained_models*/
 
 # Dataset information
 *.csv
