@@ -66,6 +66,73 @@ def fix_labels(labels, unique_labels, categorical=True):
     else:
         return labels
 
+def fix_labels_v2(labels, classification_type, unique_labels, categorical=True):
+    '''
+    Prepares the labels for training using the specifications in unique_labels.
+    This was initially done in the data generator, but given that working with
+    TFrecords does not allow some operations, labels have to be fixed here.
+
+    Args:
+    labels : numpy array
+        Contains the labels for each classification type
+    classification_type : str
+        Specifies the classification type as described in the
+        create_dataset_v2.py script.
+    unique_labels (list): list of the wanted labels and their organization
+        # For example:
+        [
+        0,
+        [1, 3],
+        [2, 4, 5],
+        6
+        ]
+
+    will return categorical labels where labels are 0, 1, 2 and 3 with:
+        - 0 having images from class 0;
+        - 1 having images from classes 1 and 3
+        - 2 having images from classes 2, 4, 5
+        - 3 having images from class 6
+
+    categorical: if True a categorical verison of the labels is returned.
+                    If False, the labels are returned as a 1D numpy array.
+    '''
+    # check inputs
+    assert type(labels) is np.ndarray, 'Labels should be np.ndarray. Given {}'.format(type(labels))
+    assert type(unique_labels) is list, 'unique_labels should be list. Given {}'.format(tyep(unique_labels))
+
+    if not isinstance(classification_type, str):
+        raise TypeError(f'classification_type expected to be a list, but give {type(classification_type)}')
+    else:
+        # chack that it specifies a know classification type
+        if not (classification_type=='c1' or classification_type=='c2' or classification_type=='c3'):
+            raise ValueError(f'classification_type expected to be c1, c2 or c3. Instead was given {classification_type}')
+
+    # get the right label list based on the classification type
+    if classification_type=='c1':
+        labels = labels[:,0]
+    elif classification_type=='c2':
+        labels = labels[:,1]
+    elif classification_type=='c3':
+        labels = labels[:,2]
+
+    # get the appropriate label based on the unique label specification
+    for idy, label in enumerate(labels):
+        for idx, u_label in enumerate(unique_labels):
+            if type(u_label) is list:
+                for i in u_label:
+                    if label == i:
+                        labels[idy] = int(idx)
+                        # break
+            elif type(u_label) is not list:
+                if label == u_label:
+                    labels[idy] = int(idx)
+                    # break
+    if categorical == True:
+        # convert labels to categorical
+        return to_categorical(labels, num_classes=len(unique_labels))
+    else:
+        return labels
+
 
 def leraningRateScheduler(lr_start, current_epoch, max_epochs, power):
     '''
