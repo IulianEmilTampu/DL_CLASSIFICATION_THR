@@ -302,7 +302,9 @@ def _parse_function_2D(proto, crop_size):
     'zdim' : tf.io.FixedLenFeature([], tf.int64),
     'nCh'  : tf.io.FixedLenFeature([], tf.int64),
     'image' : tf.io.FixedLenFeature([], tf.string),
-    'label' : tf.io.FixedLenFeature([], tf.int64)
+    'label_c1' : tf.io.FixedLenFeature([], tf.int64),
+    'label_c2' : tf.io.FixedLenFeature([], tf.int64),
+    'label_c3' : tf.io.FixedLenFeature([], tf.int64)
   }
   parsed_features = tf.io.parse_single_example(proto, key_features)
 
@@ -314,7 +316,8 @@ def _parse_function_2D(proto, crop_size):
   image = tf.io.parse_tensor(parsed_features['image'], out_type=tf.float32)
   image = tf.reshape(image, shape=[xdim,zdim,nCh])
   # image = tf.image.resize_with_crop_or_pad(tf.expand_dims(image, axis=0), crop_size[0], crop_size[1])
-  image = tf.image.resize(tf.expand_dims(image, axis=0), [crop_size[0], crop_size[1]])
+  # image = tf.image.resize(tf.expand_dims(image, axis=0), [crop_size[0], crop_size[1]])
+  image = tf.image.crop_to_bounding_box(tf.expand_dims(image, axis=0), 0, 0, crop_size[0], crop_size[1])
 
   # normalize
   image = tf.image.per_image_standardization(image)
@@ -327,9 +330,11 @@ def _parse_function_2D(proto, crop_size):
   image = tf.image.random_flip_left_right(image)
 
   # parse lable
-  label = parsed_features['label']
+  c1 = parsed_features['label_c1']
+  c2 = parsed_features['label_c2']
+  c3 = parsed_features['label_c3']
 
-  return tf.squeeze(image, axis=0), label
+  return tf.squeeze(image, axis=0), [c1, c2, c3]
 
 def preprocess_augment(dataset):
     image, label = dataset[0], dataset[1]
