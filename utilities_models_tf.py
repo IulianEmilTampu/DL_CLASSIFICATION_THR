@@ -355,6 +355,7 @@ def tictoc(tic=0, toc=1):
 
 def train(self, training_dataloader,
                 validation_dataloader,
+                classification_type,
                 unique_labels,
                 loss=('cee'),
                 start_learning_rate = 0.001,
@@ -381,6 +382,9 @@ def train(self, training_dataloader,
             Tensorflow dataloader that outputs a tuple of (image, label)
     validation_dataloader : tensorflow.python.data.ops.dataset_ops.PrefetchDataset
             Tensorflow dataloader that outputs a tuple of (image, label)
+    classification_type : str
+        Specifies the type of classification. it can be c1, c2 or c3. Needed to fix the
+        labels using the unique_labels
     unique_labels : list
         List that specifies the classes to be included in every class. This is
         needed by the fix_label function to adjust the image labels based on the
@@ -433,14 +437,6 @@ def train(self, training_dataloader,
     10 - save model if early stopping or the max number of epochs is reached
         in the specified directory
     '''
-    # check the unuque labels
-    if not isinstance(unique_labels, list):
-        raise TypeError('Invalid unique label. Given {} expected type list'.format(type(unique_labels)))
-    else:
-        self.unique_labels = unique_labels
-
-    # define parameters useful for saving the model
-    self.save_model_path = save_model_path
 
     # define parameters useful to store training and validation information
     self.train_loss_history, self.val_loss_history = [], []
@@ -455,6 +451,9 @@ def train(self, training_dataloader,
     self.num_training_samples = 0
     self.vae_kl_weight=vae_kl_weight
     self.vae_reconst_weight=vae_reconst_weight
+    self.unique_labels = unique_labels
+    self.classification_type = classification_type
+
 
     if verbose <= 2 and isinstance(verbose, int):
         self.verbose=verbose
@@ -503,7 +502,7 @@ def train(self, training_dataloader,
 
             # make data usable
             x = x.numpy()
-            y = fix_labels(y.numpy(), self.unique_labels)
+            y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels)
 
             # save information about training image size
             if epoch == 0 and step == 1:
@@ -612,7 +611,7 @@ def train(self, training_dataloader,
 
             # make data usable
             x = x.numpy()
-            y = fix_labels(y.numpy(), self.unique_labels)
+            y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels)
 
             # logits for this validation batch
             if 'VAE' in self.model_name:
@@ -779,7 +778,7 @@ def test(self, test_dataloader):
     test_start = time.time()
     for x, y in test_dataloader:
         x = x.numpy()
-        test_gt = tf.concat([test_gt, fix_labels(y.numpy(), self.unique_labels)], axis=0)
+        test_gt = tf.concat([test_gt, fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels)], axis=0)
         if 'VAE' in self.model_name:
             aus_logits, _, _, _, _, _ = self.model(x, training=False)
         else:
