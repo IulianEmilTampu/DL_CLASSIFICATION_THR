@@ -38,7 +38,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 
 # local imports
 import utilities
-import GradCAM
 
 '''
 for in line implementation
@@ -200,7 +199,7 @@ if debug is True:
         print(layer.name, layer.output_shape)
 
 ## 4.1 - Plot activation for the predicted class for consecutive layers (from shallow to deep)
-importlib.reload(GradCAM)
+importlib.reload(utilities)
 debug = False
 
 #save image or not
@@ -255,7 +254,7 @@ for i in range(images.shape[0]):
     heatmap_raw.append([])
     heatmap_rgb.append([])
     for nl in name_layers:
-        cam = GradCAM.gradCAM(model, c, layerName=nl, debug=False)
+        cam = utilities.gradCAM(model, c, layerName=nl, debug=False)
         aus_raw, aus_rgb = cam.compute_heatmap(image)
         heatmap_raw[i].append(aus_raw)
         heatmap_rgb[i].append(aus_rgb)
@@ -335,7 +334,7 @@ for i in range(images.shape[0]):
     heatmap_raw.append([])
     heatmap_rgb.append([])
     for j in range(len(unique_labels)):
-        cam = GradCAM.gradCAM(model, j, layerName=layer_name, debug=False)
+        cam = utilities.gradCAM(model, j, layerName=layer_name, debug=False)
         aus_raw, aus_rgb = cam.compute_heatmap(image)
         heatmap_raw[i].append(aus_raw)
         heatmap_rgb[i].append(aus_rgb)

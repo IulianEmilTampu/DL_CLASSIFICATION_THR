@@ -17,55 +17,6 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
 
-
-def fix_labels(labels, unique_labels, categorical=True):
-    '''
-    Prepares the labels for training using the specifications in unique_labels.
-    This was initially done in the data generator, but given that working with
-    TFrecords does not allow some operations, labels have to be fixed here.
-
-    Args:
-    labels: numpy array containing the labels
-    unique_labels (list): list of the wanted labels and their organization
-        # For example:
-        [
-        'class_0',
-        ['class_1', 'class_3'],
-        ['class_2', 'class_4', 'class_5'],
-        'class_6'
-        ]
-
-    will return categorical labels where labels are 0, 1, 2 and 3 with:
-        - 0 having images from class_0;
-        - 1 having images from class_1 and class_3
-        - 2 having images from class_2, class_4, class_5
-        - 3 having images from class_6
-
-    categorical: if True a categorical verison of the labels is returned.
-                    If False, the labels are returned as a 1D numpy array.
-    '''
-    # check inputs
-    assert type(labels) is np.ndarray, 'Labels should be np.ndarray. Given {}'.format(type(labels))
-    assert type(unique_labels) is list, 'unique_labels should be list. Given {}'.format(tyep(unique_labels))
-
-    # get the appropriate label based on the unique label specification
-    for idy, label in enumerate(labels):
-        for idx, u_label in enumerate(unique_labels):
-            if type(u_label) is list:
-                for i in u_label:
-                    if label == int(i[-1]):
-                        labels[idy] = int(idx)
-                        # break
-            elif type(u_label) is not list:
-                if label == int(u_label[-1]):
-                    labels[idy] = int(idx)
-                    # break
-    if categorical == True:
-        # convert labels to categorical
-        return to_categorical(labels, num_classes=len(unique_labels))
-    else:
-        return labels
-
 def fix_labels_v2(labels, classification_type, unique_labels, categorical=True):
     '''
     Prepares the labels for training using the specifications in unique_labels.
@@ -439,6 +390,7 @@ def train(self, training_dataloader,
     '''
 
     # define parameters useful to store training and validation information
+    self.save_model_path = save_model_path
     self.train_loss_history, self.val_loss_history = [], []
     self.train_acc_history, self.val_acc_history = [], []
     self.train_f1_history, self.val_f1_history = [], []
@@ -814,7 +766,7 @@ def save_model(self):
         'Num_classes' : self.num_classes,
         'Input_size' : self.input_size,
         'Unique_labels': self.unique_labels,
-        'Class_weights': self.class_weights.tolist(),
+        'Class_weights': self.class_weights.tolist() if not isinstance(self.class_weights, list) else self.class_weights,
         'Custom_model': self.custom_model,
         'Model_depth' : int(self.depth),
         'Num_filter_start' : self.num_filter_start,

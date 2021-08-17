@@ -61,6 +61,7 @@ parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in
 parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconstruction weight in for the VAE loss', default=0.1)
 parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
 parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
+parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
 args = parser.parse_args()
 
 # parse variables
@@ -81,6 +82,7 @@ N_FOLDS = int(args.folds)
 verbose = int(args.verbose)
 imbalance_data_strategy = args.imbalance_data_strategy
 kernel_size = [int(i) for i in args.kernel_size]
+debug = bool(args.debug)
 
 # # parse variables
 # working_folder = '/flush/iulta54/Research/P3-THR_DL/'
@@ -116,18 +118,29 @@ if not os.path.isdir(dataset_folder):
     print(f'The dataset folder provided does not exist. Input a valid one. Given {dataset_folder}')
     sys.exit()
 
-print('working directory - {}'.format(working_folder))
-print('model configuration - {}'.format(model_configuration))
+if debug:
+    print(debug)
+    print(f'\n{"-"*61}')
+    print(f'{"Configuration file script - running in debug mode (less data)"}')
+    print(f'{"-"*61}\n')
+else:
+    print(f'\n{"-"*25}')
+    print(f'{"Configuration file script"}')
+    print(f'{"-"*25}\n')
+
+
+print(f'{"Working directory":<26s}: {working_folder}')
+print(f'{"Model configuration":<26s}: {model_configuration}')
 if model_configuration == 'VAE':
-    print(' - VAE latent space dimension:{}'.format(vae_latent_dim))
-    print(' - VAE KL loss weight:{}'.format(vae_kl_weight))
-print('model save name - {}'.format(model_save_name))
-print('classification type - {}'.format(classification_type))
-print('Loss function - {}'.format(loss))
-print('Learning rate - {}'.format(learning_rate))
-print('Batch size - {}'.format(batch_size))
-print('Input size - {}'.format(input_size))
-print('Data augmentation - {} \n\n'.format(data_augmentation))
+    print(f'{"VAE latent space dimension":<26s}: {vae_latent_dim}')
+    print(f'{"VAE KL loss weight":<26s}: {vae_kl_weight}')
+print(f'{"Model save name":<26s}: {model_save_name}')
+print(f'{"Classification type":<26s}: {classification_type}')
+print(f'{"Loss function":<26s}: {loss}')
+print(f'{"Learning rate":<26s}: {learning_rate}')
+print(f'{"Batch size":<26s}: {batch_size}')
+print(f'{"Input size":<26s}: {input_size}')
+print(f'{"Data augmentation":<26s}: {data_augmentation} ')
 
 ## get all file names, configure based on classification type and unique labels
 '''
@@ -168,6 +181,14 @@ classification_type_dict['c3']['class_labels'] = ['normal', 'Goiter', 'Adenoma',
 
 
 file_names = glob.glob(os.path.join(dataset_folder, '*'))
+
+# just for debug - remove afterwards
+if debug:
+    print('Running in debug mode - using less data \n')
+    random.seed(29)
+    random.shuffle(file_names)
+    file_names = file_names[0:10000]
+
 file_names, labels, per_class_file_names = utilities.get_organized_files(file_names,
                     classification_type=classification_type,
                     custom=True,
@@ -189,7 +210,7 @@ for c in per_class_file_names:
     per_class_unique_volumes.append(list(dict.fromkeys(aus)))
 
 # 2
-n_test_volumes_per_class = 0
+n_test_volumes_per_class = 2
 random.seed(29)
 test_volumes = []
 for c in per_class_unique_volumes:
@@ -207,9 +228,6 @@ for c in test_volumes:
 
 train_val_filenames = [file_names[i] for i in range(len(file_names)) if i not in test_indexes]
 
-n_train = len(train_val_filenames)
-n_test = len(test_filenames)
-
 # make sure that no training file is in the test set
 for f in train_val_filenames:
     if f in test_filenames:
@@ -222,7 +240,7 @@ train_val_filenames, train_val_labels, per_class_file_names = utilities.get_orga
                     custom_labels=classification_type_dict[classification_type]['unique_labels'])
 
 class_weights = np.array([len(i) for i in per_class_file_names])
-print(f'Using {imbalance_data_strategy} strategy to handle imbalance data.')
+print(f'\nUsing {imbalance_data_strategy} strategy to handle imbalance data.')
 if imbalance_data_strategy == 'oversampling':
     # get the class with highest number of elements
     better_represented_class = np.argmax(class_weights)
@@ -243,7 +261,12 @@ elif imbalance_data_strategy == 'weights':
     class_weights = class_weights.sum() / class_weights**1
     class_weights = class_weights / class_weights.sum()
 
-print('Class weights -> {}'.format(class_weights))
+n_train = len(train_val_filenames)
+n_test = len(test_filenames)
+
+print(f'\nWill train and validate on {n_train} images')
+print(f'Will test on {n_test} images ({n_test_volumes_per_class} for each class)')
+print(f'{"Class weights":<26s}: {class_weights}')
 
 ## prepare for cross validation
 '''
@@ -254,6 +277,7 @@ validation for every fold and then save the images belonging to that volumes.
 2 - split each class independently for cross validation
 3 - save file names for each fold
 '''
+print(f'\nSetting cross-validation files...')
 # 1
 per_class_unique_volumes = []
 for c in per_class_file_names:
@@ -262,7 +286,6 @@ for c in per_class_file_names:
     per_class_unique_volumes.append(list(dict.fromkeys(aus)))
 
 # 2
-N_FOLDS = 2
 kf = KFold(n_splits=N_FOLDS)
 per_fold_train_files = [[] for i in range(N_FOLDS)]
 per_fold_val_files = [[] for i in range(N_FOLDS)]
@@ -279,6 +302,13 @@ for c in per_class_unique_volumes:
             val_vol = c[v]
             per_fold_val_files[idx].extend([f for f in train_val_filenames if val_vol in f])
 
+# shuffle training files (since that there can be many files, the buffer size
+# for the generator should be very large. By shuffling now we can reduce the
+# buffer size).
+
+for c in range(N_FOLDS):
+    random.shuffle(per_fold_train_files[c])
+
 # check that the split is valid
 for c in range(N_FOLDS):
     for tr_f in per_fold_train_files[c]:
@@ -286,7 +316,7 @@ for c in range(N_FOLDS):
             print(f'File {os.path.basename(tr_f)} in both set for fold {c}')
             raise ValueError('Train validation split did not go as planned \n Some training file are in the validation set. Check implementation')
 
-print('Cross-validation set. Running a {}-fold cross validation'.format(N_FOLDS))
+print(f'Cross-validation set. Running a {N_FOLDS}-fold cross validation')
 
 
 ## Save all the information in a configuration file
@@ -295,6 +325,8 @@ The configuration file will be used by the training routine to access the
 the train-val-test files as well as the different set-up for the model. Having a
 separate configuration file helps keeping the training routine more clean.
 '''
+print(f'\nSavingconfiguration file...')
+
 json_dict = OrderedDict()
 json_dict['working_folder'] = working_folder
 json_dict['dataset_folder'] = dataset_folder
@@ -312,10 +344,10 @@ json_dict['input_size'] = input_size
 json_dict['kernel_size'] = kernel_size
 json_dict['data_augmentation'] = data_augmentation
 
-if 'VAE' in model_configuration:
-    json_dict['vae_latent_dim'] = vae_latent_dim
-    json_dict['vae_kl_weight'] = vae_kl_weight
-    json_dict['vae_reconst_weight'] = vae_reconst_weight
+
+json_dict['vae_latent_dim'] = vae_latent_dim
+json_dict['vae_kl_weight'] = vae_kl_weight
+json_dict['vae_reconst_weight'] = vae_reconst_weight
 
 json_dict['N_FOLDS'] = N_FOLDS
 json_dict['verbose'] = verbose
@@ -327,7 +359,7 @@ json_dict['test'] = test_filenames
 json_dict['class_weights'] = list(class_weights)
 
 # save file
-save_model_path = os.path.join(working_folder, 'trained_models_test', model_save_name)
+save_model_path = os.path.join(working_folder, 'trained_models', model_save_name)
 
 if not os.path.isdir(save_model_path):
     os.mkdir(save_model_path)
