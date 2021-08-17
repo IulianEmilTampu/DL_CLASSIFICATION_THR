@@ -276,11 +276,13 @@ What we need to parce is
 # dataset_specs = args.dataset_specs
 
 # parse variables
-data_folder = '/home/iulta54/Desktop/Testing/TH_DL_dummy_dataset/Raw'
-destination_folder = '/home/iulta54/Desktop/Testing/TH_DL_dummy_dataset/Created'
+data_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/Raw_OCT_data'
+destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/remaining'
 spatial_size = [1.4, 2.0]
 isotropic_res = 0.007
-dataset_specs = '/home/iulta54/Desktop/Testing/TH_DL_dummy_dataset/volumewise_annotations_refined_dummy.csv'
+dataset_specs = /flush/iulta54/Research/P3-THR_DL/volumewise_annotations_refined_v4.csv
+
+
 
 print('\n\n OCT dataset preparation script (this may take a while depending on the number of files and their size...).\n')
 
@@ -366,7 +368,7 @@ class_bscan_counter = {'c1':[0,0,0],
                         }
 
 for counter, f in enumerate(files):
-    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 1/3 (cropping and resampling)":33s} \r', end='')
+    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 1/3 (cropping and resampling)":40s} \r', end='')
 
     # initiate log dictionary
     log_dict={}
@@ -419,7 +421,7 @@ for counter, f in enumerate(files):
     log_dict['Final_anisotropic_image_shape'] = volume_data.shape[0:2]
 
     # ## save every 2D anisotropic b-scan as .nii and TFR
-    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 2/3 (saving anisotropic b-scans)":33s}\r', end='')
+    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 2/3 (saving anisotropic b-scans)":40s}\r', end='')
 
     # make folders
     nii_save_folder = os.path.join(destination_folder, '2D_anisotropic')
@@ -460,7 +462,7 @@ for counter, f in enumerate(files):
         del writer
 
     # ## save every 2D isotropic b-scan as .nii and TFR
-    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 3/3 (saving isotropic b-scans)":33s}\r', end='')
+    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 3/3 (saving isotropic b-scans)":40s}\r', end='')
 
     # make folders
     nii_save_folder = os.path.join(destination_folder, '2D_isotropic')
@@ -505,14 +507,11 @@ for counter, f in enumerate(files):
 
     # log info
     logfile = open(logfile_path, 'a')
-    logfile.write(f'Volume {f["file_name"]} \n')
+    logfile.write(f'Volume {counter+1:3d}/{count_file:3d} - {f["file_name"]} \n')
     for key, values in log_dict.items():
         logfile.write(' - {}: {}\n'.format(key, values))
     logfile.write('\n')
     logfile.close()
-
-    if counter == 5:
-        break
 
 ## Save dataset information
 
