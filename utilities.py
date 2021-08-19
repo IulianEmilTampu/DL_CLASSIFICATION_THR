@@ -88,11 +88,14 @@ def get_organized_files(file_names, classification_type,
     if not isinstance(classification_type, str):
         raise TypeError(f'classification_type expected to be a list, but give {type(classification_type)}')
     else:
-        # chack that it specifies a know classification type
-        if not (classification_type=='c1' or classification_type=='c2' or classification_type=='c3'):
-            raise ValueError(f'classification_type expected to be c1, c2 or c3. Instead was given {classification_type}')
+        if not custom:
+            # check that it specifies a know classification type
+            if not (classification_type=='c1' or classification_type=='c2' or classification_type=='c3'):
+                raise ValueError(f'Not custom classification was set. classification_type expected to be c1, c2 or c3. Instead was given {classification_type}')
 
     if custom:
+        # set lassification type to c3
+        classification_type = 'c3'
         # custom label aggregation given, thus checking if custom_labels is given
         if custom_labels:
             # chack that is a list

@@ -48,7 +48,8 @@ parser.add_argument('-wd','--working_directory' ,required=False, help='Provide t
 parser.add_argument('-df', '--dataset_folder', required=True, help='Provide the Dataset Folder where the Train and Test folders are present along with the dataset information file.')
 parser.add_argument('-mc', '--model_configuration', required=False, help='Provide the Model Configuration (LightOCT, M2, M3, ResNet50, VAE or others if implemented in the models_tf.py file).', default='LightOCT')
 parser.add_argument('-mn', '--model_name', required=False, help='Provide the Model Name. This will be used to create the folder where to save the model. If not provided, the current datetime will be used', default=datetime.now().strftime("%H:%M:%S"))
-parser.add_argument('-ct', '--classification_type', required=False, help='Provide the Classification Type. Chose between 1 (normal-vs-disease), 2 (normal-vs-enlarged-vs-shrinked) and 3 (normal-vs-all_diseases_available). If not provided, normal-vs-disease will be used.', default=1)
+parser.add_argument('-ct', '--classification_type', required=False, help='Provide the Classification Type. Chose between 1 (normal-vs-disease), 2 (normal-vs-enlarged-vs-shrinked) and 3 (normal-vs-all_diseases_available). If not provided, normal-vs-disease will be used.', default='c1')
+parser.add_argument('-cct', '--custom_classification_type', required=False, help='If the classification type is custom (not one of the dfefault one). If true, training test split will be generated here instead of using the already available one in the dataset folder. Note that all the custom classification arte based on the per-disease class split.', default=False)
 parser.add_argument('-f', '--folds', required=False, help='Number of folds. Default is 3', default='3')
 parser.add_argument('-l', '--loss', required=False, help='Loss to use to train the model (cce, wcce or sfce). Default is cce', default='cce')
 parser.add_argument('-lr', '--learning_rate', required=False, help='Learning rate.', default=0.001)
@@ -70,6 +71,7 @@ dataset_folder = args.dataset_folder
 model_configuration = args.model_configuration
 model_save_name = args.model_name
 classification_type = args.classification_type
+custom_classification = args.custom_classification_type == 'True'
 loss = args.loss
 learning_rate = float(args.learning_rate)
 batch_size = int(args.batch_size)
@@ -82,14 +84,15 @@ N_FOLDS = int(args.folds)
 verbose = int(args.verbose)
 imbalance_data_strategy = args.imbalance_data_strategy
 kernel_size = [int(i) for i in args.kernel_size]
-debug = bool(args.debug)
+debug = args.debug == 'True'
 
 # # parse variables
 # working_folder = '/flush/iulta54/Research/P3-THR_DL/'
-# dataset_folder = '/home/iulta54/Desktop/Testing/TH_DL_dummy_dataset/Created/2D_isotropic_TFR'
+# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
 # model_configuration = 'LightOCT'
 # model_save_name = 'Test_new_dataset_LightOCT'
-# classification_type = 'c1'
+# classification_type = 'c4'
+# custom_classification = True
 # loss = 'cce'
 # learning_rate = 0.0001
 # batch_size = 100
@@ -102,13 +105,14 @@ debug = bool(args.debug)
 # verbose = 2
 # imbalance_data_strategy = 'oversampling'
 # kernel_size = [5,5]
+# debug = False
 
 # check if working folder and dataset folder exist
 if os.path.isdir(working_folder):
     # check if the trained_model folder exists, if not create it
-    if not os.path.isdir(os.path.join(working_folder, 'trained_models_test')):
+    if not os.path.isdir(os.path.join(working_folder, 'trained_models')):
         print('trained_model folders does not exist in the working path, creating it...')
-        save_path = os.path.join(working_folder, 'trained_models_test')
+        save_path = os.path.join(working_folder, 'trained_models')
         os.mkdir(save_path)
 else:
     print('The provided working folder does not exist. Input a valid one. Given {}'.format(working_folder))
@@ -119,15 +123,13 @@ if not os.path.isdir(dataset_folder):
     sys.exit()
 
 if debug:
-    print(debug)
-    print(f'\n{"-"*61}')
-    print(f'{"Configuration file script - running in debug mode (less data)"}')
-    print(f'{"-"*61}\n')
+    print(f'\n{"-"*70}')
+    print(f'{"Configuration file script - running in debug mode (less training data)"}')
+    print(f'{"-"*70}\n')
 else:
     print(f'\n{"-"*25}')
     print(f'{"Configuration file script"}')
     print(f'{"-"*25}\n')
-
 
 print(f'{"Working directory":<26s}: {working_folder}')
 print(f'{"Model configuration":<26s}: {model_configuration}')
@@ -136,11 +138,13 @@ if model_configuration == 'VAE':
     print(f'{"VAE KL loss weight":<26s}: {vae_kl_weight}')
 print(f'{"Model save name":<26s}: {model_save_name}')
 print(f'{"Classification type":<26s}: {classification_type}')
+print(f'{"Custom classification":<26s}: {custom_classification}')
 print(f'{"Loss function":<26s}: {loss}')
 print(f'{"Learning rate":<26s}: {learning_rate}')
 print(f'{"Batch size":<26s}: {batch_size}')
 print(f'{"Input size":<26s}: {input_size}')
 print(f'{"Data augmentation":<26s}: {data_augmentation} ')
+
 
 ## get all file names, configure based on classification type and unique labels
 '''
@@ -178,55 +182,115 @@ classification_type_dict['c3'] = {}
 classification_type_dict['c3']['unique_labels'] = [0,1,2,3,4,5]
 classification_type_dict['c3']['class_labels'] = ['normal', 'Goiter', 'Adenoma', 'Hashimoto', 'Graves', 'Cancer']
 
+classification_type_dict['c4'] = {}
+classification_type_dict['c4']['unique_labels'] = [0,[1,2],3,[4,5]]
+classification_type_dict['c4']['class_labels'] = ['normal', 'Goiter', 'Adenoma', 'Hashimoto', 'Graves', 'Cancer']
+
+# check if we are using a default classification type. If yes, use the train_test_split.json file
+
+if custom_classification:
+    print(f'\nClassification type is not a default one. Splitting the data accordingly.')
+    print(f'{"Unique labels":<26s}: {classification_type_dict[classification_type]["unique_labels"]} ')
+    # infere file extention from the dataset files
+    _, extension = os.path.splitext(glob.glob(os.path.join(dataset_folder, '*'))[10])
+    file_names = glob.glob(os.path.join(dataset_folder, '*'+extension))
+    # use less data in debug mode
+    if debug:
+        print('Running in debug mode - using less training data \n')
+        random.seed(29)
+        random.shuffle(file_names)
+        file_names = file_names[0:10000]
+else:
+    if (classification_type == 'c1' or classification_type == 'c2' or classification_type == 'c3'):
+        if os.path.isfile(os.path.join(dataset_folder, 'train_test_split.json')):
+            print(f'\nUsing default training test split (available in the train_test_split.json file)')
+            print(f'{"Unique labels":<26s}: {classification_type_dict[classification_type]["unique_labels"]} ')
+            with open(os.path.join(dataset_folder, 'train_test_split.json')) as file:
+                split = json.load(file)
+                train_val_filenames = split['training']
+                print(f'Initial training files: {len(train_val_filenames)}')
+                # debug mode
+                if debug:
+                    print('Running in debug mode - using less training data \n')
+                    random.seed(29)
+                    random.shuffle(train_val_filenames)
+                    train_val_filenames = train_val_filenames[0:10000]
+
+                if classification_type == 'c1':
+                    test_filenames = split['c1_test']
+                if classification_type == 'c2':
+                    test_filenames = split['c2_test']
+                if classification_type == 'c3':
+                    test_filenames = split['c3_test']
+
+                # append basefolder and extention to the files
+                # infere file extention from the dataset files
+                _, extension = os.path.splitext(glob.glob(os.path.join(dataset_folder, '*'))[10])
+                train_val_filenames = [os.path.join(dataset_folder, f+extension) for f in train_val_filenames]
+                test_filenames = [os.path.join(dataset_folder, f+extension) for f in test_filenames]
+        else:
+            raise ValueError(f'Using default classification type, but not train_test_split.json file found. Run the set_test_set.py first')
+    else:
+        raise ValueError(f'Custom classification type was set to False, but the given classification type is not a default one. Given {classification_type} expecting c1, c2 or c3.')
 
 
-file_names = glob.glob(os.path.join(dataset_folder, '*'))
+## split dataset into train+validation and test if custom classicifation
+n_images_per_class = 1000
+min_n_volumes = 2
 
-# just for debug - remove afterwards
-if debug:
-    print('Running in debug mode - using less data \n')
+if custom_classification:
+    importlib.reload(utilities)
+    '''
+    Use n_images_per_class of at least 2 volumes for each class as test sample
+    1 - find unique volumes for each class
+    2 - randomly select volumes for test (to reach n_images_per_class images)
+    3 - randomly select n_images_per_class from the selected volumes for each class
+    4 - get all the remaining files for train+validation
+    '''
+
+
+    file_names, labels, per_class_file_names = utilities.get_organized_files(file_names,
+                        classification_type=classification_type,
+                        custom=True,
+                        custom_labels=classification_type_dict[classification_type]['unique_labels'])
+    n_classes = len(classification_type_dict[classification_type]['unique_labels'])
+
+    # 1
+    per_class_unique_volumes = []
+    for c in per_class_file_names:
+        # reduce the name to contain only the sample code and scan_code
+        aus = [os.path.basename(i[0:i.find('c1')-1]) for i in c]
+        per_class_unique_volumes.append(list(dict.fromkeys(aus)))
+
+    # 2
     random.seed(29)
-    random.shuffle(file_names)
-    file_names = file_names[0:10000]
+    per_class_random_files = []
+    index_of_selected_files = []
 
-file_names, labels, per_class_file_names = utilities.get_organized_files(file_names,
-                    classification_type=classification_type,
-                    custom=True,
-                    custom_labels=classification_type_dict[classification_type]['unique_labels'])
-n_classes = len(classification_type_dict[classification_type]['unique_labels'])
-## split dataset into train+validation and test
-'''
-Use the images of 2 volumes for each class as test sample
-1 - find unique volumes for each class
-2 - randomly select volumes for test
-3 - get all the images belonging to those volumes and save them for testing
-4 - get all the remaining files for train+validation
-'''
-# 1
-per_class_unique_volumes = []
-for c in per_class_file_names:
-    # reduce the name to contain only the sample code and scan_code
-    aus = [os.path.basename(i[0:i.find('c1')-1]) for i in c]
-    per_class_unique_volumes.append(list(dict.fromkeys(aus)))
+    for c in per_class_unique_volumes:
+        # for this class, shuffle the volumes and get all the images untill we reach the limit
+        random.shuffle(c)
+        count = 0
+        idx = 0
+        per_class_random_files.append([])
+        while count <= n_images_per_class or idx < min_n_volumes:
+            # get all the files from that volume
+            indexes = [i for i, f in enumerate(file_names) if c[idx] in f]
+            per_class_random_files[-1].extend([file_names[i] for i in indexes])
+            index_of_selected_files.extend(indexes)
+            count += len(indexes)
+            idx += 1
 
-# 2
-n_test_volumes_per_class = 2
-random.seed(29)
-test_volumes = []
-for c in per_class_unique_volumes:
-    test_idx = random.sample(range(0, len(c)), n_test_volumes_per_class)
-    test_volumes.append([c[i] for i in test_idx])
+    for i, c in enumerate(per_class_random_files):
+        print(f'{"Unique labels:"+str(classification_type_dict[classification_type]["unique_labels"][i]):26s}: {len(c):4d} files')
 
-# 3
-test_filenames = []
-test_indexes = []
-for c in test_volumes:
-    for vol in c:
-        indexes = [i for i, x in enumerate(file_names) if vol in x]
-        test_indexes.extend(indexes)
-        test_filenames.extend([file_names[i] for i in indexes])
+    # 3 get exactly n_images_per_class from each class and set it to the test set
+    test_filenames = []
+    for f in per_class_random_files:
+        test_filenames.extend(random.sample(f, n_images_per_class))
 
-train_val_filenames = [file_names[i] for i in range(len(file_names)) if i not in test_indexes]
+    # 4 get the remaining training validation files
+    train_val_filenames = [f for i, f in enumerate(file_names) if i not in index_of_selected_files]
 
 # make sure that no training file is in the test set
 for f in train_val_filenames:
@@ -234,39 +298,64 @@ for f in train_val_filenames:
         raise ValueError('Train testing split did not go as planned. Check implementation')
 
 ## compute class weights on the training dataset and apply imbalance data strategy
+
+imbalance_data_strategy = 'oversampling'
+
 train_val_filenames, train_val_labels, per_class_file_names = utilities.get_organized_files(train_val_filenames,
                     classification_type=classification_type,
                     custom=True,
                     custom_labels=classification_type_dict[classification_type]['unique_labels'])
 
 class_weights = np.array([len(i) for i in per_class_file_names])
-print(f'\nUsing {imbalance_data_strategy} strategy to handle imbalance data.')
 if imbalance_data_strategy == 'oversampling':
     # get the class with highest number of elements
     better_represented_class = np.argmax(class_weights)
     num_sample_to_eversample = [class_weights[better_represented_class] - len(i) for i in per_class_file_names]
 
-    # sample where needed and add to the training file names
+    # check if oversampling is reasonable (not replicate an entire dataset more
+    # than 3 times).
+    rep = 0
+
     for idx, i in enumerate(num_sample_to_eversample):
         # only oversample where is needed
         if i != 0:
-            n_class_samples = len(per_class_file_names[idx])
-            train_val_filenames.extend(per_class_file_names[idx]*int(i // n_class_samples))
-            train_val_filenames.extend(random.sample(per_class_file_names[idx], int(i % n_class_samples)))
+            if int(i // len(per_class_file_names[idx])) > rep:
+                rep = int(i // len(per_class_file_names[idx]))
 
-    class_weights = np.ones(n_classes)
-    print('Setting loss function to cce given the oversampling strategy')
-    loss = 'cce'
+    if rep < 2:
+        # sample where needed and add to the training file names
+        for idx, i in enumerate(num_sample_to_eversample):
+            # only oversample where is needed
+            if i != 0:
+                n_class_samples = len(per_class_file_names[idx])
+                train_val_filenames.extend(per_class_file_names[idx]*int(i // n_class_samples))
+                train_val_filenames.extend(random.sample(per_class_file_names[idx], int(i % n_class_samples)))
+
+        class_weights = np.ones(n_classes)
+        print(f'\nUsing {imbalance_data_strategy} strategy to handle imbalance data.')
+        print(f'Setting loss function to cce given the oversampling strategy')
+        loss = 'cce'
+    else:
+        print(f'Avoiding oversampling strategy since this will imply repeating one of the classes more that 3 times')
+        print(f'Using class weights instead. Setting loss function to weighted categorical cross entropy (wcce)')
+        imbalance_data_strategy = 'weights'
+        class_weights = class_weights.sum() / class_weights**1
+        class_weights = class_weights / class_weights.sum()
+        loss = 'wcce'
+
 elif imbalance_data_strategy == 'weights':
+    print(f'\nUsing {imbalance_data_strategy} strategy to handle imbalance data.')
+    print(f'Setting loss function to wcce given the oversampling strategy')
     class_weights = class_weights.sum() / class_weights**1
     class_weights = class_weights / class_weights.sum()
+    loss = 'wcce'
 
 n_train = len(train_val_filenames)
 n_test = len(test_filenames)
 
-print(f'\nWill train and validate on {n_train} images')
-print(f'Will test on {n_test} images ({n_test_volumes_per_class} for each class)')
-print(f'{"Class weights":<26s}: {class_weights}')
+print(f'\nWill train and validate on {n_train} images (some might have been removed since not classifiebly in this task)')
+print(f'Will test on {n_test} images ({n_images_per_class} for each class)')
+print(f'{"Class weights":<10s}: {class_weights}')
 
 ## prepare for cross validation
 '''
@@ -317,6 +406,9 @@ for c in range(N_FOLDS):
             raise ValueError('Train validation split did not go as planned \n Some training file are in the validation set. Check implementation')
 
 print(f'Cross-validation set. Running a {N_FOLDS}-fold cross validation')
+print(f'Images from the validation set are taken from volumes not in the training sets')
+for f in range(N_FOLDS):
+    print(f'Fold {f+1}: training on {len(per_fold_train_files[f]):5d} and validation on {len(per_fold_val_files[f]):5d}')
 
 
 ## Save all the information in a configuration file
