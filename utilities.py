@@ -98,7 +98,7 @@ def get_organized_files(file_names, classification_type,
         classification_type = 'c3'
         # custom label aggregation given, thus checking if custom_labels is given
         if custom_labels:
-            # chack that is a list
+            # check that is a list
             if not isinstance(custom_labels, list):
                 raise TypeError(f'custom_labels expected to be a list, but given {type(custom_labels)}')
         else:
@@ -591,40 +591,50 @@ def plotPR(GT, PRED, classes, savePath=None, draw=False):
 ## OTHER PLOTTING
 
 # Helper function to show a batch
-def show_batch_2D(sample_batched, title=''):
+def show_batch_2D(sample_batched, title=None, img_per_row=10):
+
+    from mpl_toolkits.axes_grid1 import ImageGrid
     """
-    Show sample image (z,x) for a batch of oct images.
+    Creates a grid of images with the samples contained in a batch of data.
+
+    Parameters
+    ----------
+    sample_batch : tuple
+        COntains the actuall images (sample_batch[0]) and their label
+        (sample_batch[1]).
+    title : str
+        Title of the created image
+    img_per_row : int
+        number of images per row in the created grid of images.
     """
     batch_size = len(sample_batched[0])
-    nrows = batch_size//10
-    if batch_size%3 > 0:
+    nrows = batch_size//img_per_row
+    if batch_size%img_per_row > 0:
         nrows += 1
+    ncols = img_per_row
 
-    # convert to pythorch if numpy
-    if type(sample_batched[0]) is np.ndarray:
-        # numpy arrays are given, convert to pytorch tensors with [B,C,D,W] convention
-        x = torch.tensor(sample_batched[0]).permute(0,3,1,2)
-        y = torch.tensor(sample_batched[1])
-        sample_batched = (x, y)
+    # make figure grid
+    fig = plt.figure(figsize=(4., 4.))
+    grid = ImageGrid(fig, 111,
+                    nrows_ncols=(nrows, ncols),
+                    axes_pad=0.3,  # pad between axes in inch.
+                    label_mode='L',
+                    )
 
-    image_grid = utils.make_grid(sample_batched[:][0], nrow=nrows)
-
-    if not list(sample_batched[1][1].size()):
-        # print('Empty {}'.format(list(sample_batched[1][1].size())))
-        label_grid = [int(x) for x in sample_batched[:][1]]
+    # fill in the axis
+    for i in range(batch_size):
+        img = np.squeeze(sample_batched[0][i,:,:])
+        grid[i].imshow(img, cmap='gray', interpolation=None)
+        grid[i].set_xticks([])
+        grid[i].set_yticks([])
+        grid[i].set_title(sample_batched[1][i])
+    if title:
+        fig.suptitle(title, fontsize=20)
     else:
-        # print('Not empty {}'.format(list(sample_batched[1][1].size())))
-        label_grid = utils.make_grid(sample_batched[:][1], nrow=nrows)
-
-    # reshape from [C, D, W] to [D, W, C]
-    plt.imshow(image_grid.numpy().transpose(1,2,0)[:,:,0], cmap='gray', interpolation=None)
-
-    if not list(sample_batched[1][1].size()):
-        plt.title(label_grid)
-    else:
-        plt.imshow(label_grid.numpy().transpose(1,2,0)[:,:,0], cmap = 'Dark2', norm=colors.Normalize(vmin=0, vmax=4), alpha=0.5)
-        plt.title('Batch from dataloader')
+        fig.suptitle('Batch of data', fontsize=20)
     plt.show()
+
+
 
 '''
 Grad-CAM implementation [1] as described in post available at [2].
