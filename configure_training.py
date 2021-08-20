@@ -90,7 +90,7 @@ debug = args.debug == 'True'
 # working_folder = '/flush/iulta54/Research/P3-THR_DL/'
 # dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
 # model_configuration = 'LightOCT'
-# model_save_name = 'Test_new_dataset_LightOCT'
+# model_save_name = 'LightOCT_TEST'
 # classification_type = 'c4'
 # custom_classification = True
 # loss = 'cce'
@@ -209,12 +209,6 @@ else:
                 split = json.load(file)
                 train_val_filenames = split['training']
                 print(f'Initial training files: {len(train_val_filenames)}')
-                # debug mode
-                if debug:
-                    print('Running in debug mode - using less training data \n')
-                    random.seed(29)
-                    random.shuffle(train_val_filenames)
-                    train_val_filenames = train_val_filenames[0:10000]
 
                 if classification_type == 'c1':
                     test_filenames = split['c1_test']
@@ -228,6 +222,13 @@ else:
                 _, extension = os.path.splitext(glob.glob(os.path.join(dataset_folder, '*'))[10])
                 train_val_filenames = [os.path.join(dataset_folder, f+extension) for f in train_val_filenames]
                 test_filenames = [os.path.join(dataset_folder, f+extension) for f in test_filenames]
+
+                # debug modeaus = [os.path.basename(i[0:i.find('c1')-1]) for i in c]
+                if debug:
+                    print('Running in debug mode - using less training data \n')
+                    random.seed(29)
+                    random.shuffle(train_val_filenames)
+                    train_val_filenames = train_val_filenames[0:20000]
         else:
             raise ValueError(f'Using default classification type, but not train_test_split.json file found. Run the set_test_set.py first')
     else:
@@ -239,6 +240,7 @@ n_images_per_class = 1000
 min_n_volumes = 2
 
 if custom_classification:
+    print('Working on the test dataset...')
     importlib.reload(utilities)
     '''
     Use n_images_per_class of at least 2 volumes for each class as test sample
@@ -282,7 +284,7 @@ if custom_classification:
             idx += 1
 
     for i, c in enumerate(per_class_random_files):
-        print(f'{"Unique labels:"+str(classification_type_dict[classification_type]["unique_labels"][i]):26s}: {len(c):4d} files')
+        print(f'{"Unique labels:"+str(classification_type_dict[classification_type]["unique_labels"][i]):26s}: {len(c):4d} test files')
 
     # 3 get exactly n_images_per_class from each class and set it to the test set
     test_filenames = []
@@ -298,8 +300,6 @@ for f in train_val_filenames:
         raise ValueError('Train testing split did not go as planned. Check implementation')
 
 ## compute class weights on the training dataset and apply imbalance data strategy
-
-imbalance_data_strategy = 'oversampling'
 
 train_val_filenames, train_val_labels, per_class_file_names = utilities.get_organized_files(train_val_filenames,
                     classification_type=classification_type,
@@ -373,12 +373,21 @@ for c in per_class_file_names:
     # reduce the name to contain only the sample code and scan_code
     aus = [os.path.basename(i[0:i.find('c1')-1]) for i in c]
     per_class_unique_volumes.append(list(dict.fromkeys(aus)))
+    random.shuffle(per_class_unique_volumes[-1])
 
+
+# for i, c in enumerate(classification_type_dict[classification_type]['unique_labels']):
+#     print(f'{c}')
+#     for v in per_class_unique_volumes[i]:
+#         print(v)
+
+##
 # 2
 kf = KFold(n_splits=N_FOLDS)
 per_fold_train_files = [[] for i in range(N_FOLDS)]
 per_fold_val_files = [[] for i in range(N_FOLDS)]
-for c in per_class_unique_volumes:
+
+for idx1, c in enumerate(per_class_unique_volumes):
     # for all classes
     for idx, (train_volume_index, val_volume_index) in enumerate(kf.split(c)):
         # use the indexes of the unique volumes for split the data
@@ -389,6 +398,7 @@ for c in per_class_unique_volumes:
         # validation
         for v in val_volume_index:
             val_vol = c[v]
+            # print(f'Fold {idx} - Validation: {val_vol}')
             per_fold_val_files[idx].extend([f for f in train_val_filenames if val_vol in f])
 
 # shuffle training files (since that there can be many files, the buffer size
@@ -397,6 +407,7 @@ for c in per_class_unique_volumes:
 
 for c in range(N_FOLDS):
     random.shuffle(per_fold_train_files[c])
+    random.shuffle(per_fold_val_files[c])
 
 # check that the split is valid
 for c in range(N_FOLDS):
@@ -404,6 +415,7 @@ for c in range(N_FOLDS):
         if tr_f in per_fold_val_files[c]:
             print(f'File {os.path.basename(tr_f)} in both set for fold {c}')
             raise ValueError('Train validation split did not go as planned \n Some training file are in the validation set. Check implementation')
+
 
 print(f'Cross-validation set. Running a {N_FOLDS}-fold cross validation')
 print(f'Images from the validation set are taken from volumes not in the training sets')
