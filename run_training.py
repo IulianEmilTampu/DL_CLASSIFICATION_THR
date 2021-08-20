@@ -78,6 +78,7 @@ test_fold_summary = {}
 
 ## loop through the folds
 importlib.reload(utilities_models_tf)
+import tensorflow.keras.layers as layers
 # ############################ TRAINING
 for cv in range(config['N_FOLDS']):
     print('Working on fold {}/{}. Start time {}'.format(cv+1, config['N_FOLDS'], datetime.now().strftime("%H:%M:%S")))
@@ -113,7 +114,7 @@ for cv in range(config['N_FOLDS']):
     elif config['model_configuration'] == 'M2':
         model = models_tf.M2(number_of_input_channels = 1,
                         model_name='M2',
-                        num_classes = len(unique_labels),
+                        num_classes = len(config['unique_labels']),
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size']
@@ -201,7 +202,7 @@ for cv in range(config['N_FOLDS']):
                         power = 0.1,
                         vae_kl_weight=config['vae_kl_weight'],
                         vae_reconst_weight=config['vae_reconst_weight'],
-                        max_epochs=15,
+                        max_epochs=20,
                         early_stopping=True,
                         patience=10,
                         save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
