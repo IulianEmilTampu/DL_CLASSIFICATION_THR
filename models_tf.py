@@ -163,11 +163,15 @@ class M2(object):
             x = MaxPooling2D(pool_size=(2,2),
                         strides=2
                         )(x)
-        # FCN
+
+        x = layers.SpatialDropout2D(0.2)(x)
+        x = Conv2D(filters = self.num_classes,
+                   kernel_size=self.kernel_size)(x)
         x = GlobalMaxPooling2D()(x)
-        x = Dropout(rate=0.2)(x)
-        x = Dense(units=60, activation='relu')(x)
-        final = Dense(units=self.num_classes, activation='softmax')(x)
+        # x = Dropout(rate=0.2)(x)
+        # x = Dense(units=60, activation='relu')(x)
+        # final = Dense(units=self.num_classes, activation='softmax')(x)
+        final = layers.Softmax()(x)
 
         # save model paramenters
         self.num_filter_start = n_filters[0]
