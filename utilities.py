@@ -191,13 +191,6 @@ def _parse_function_2D(proto, crop_size):
   image = tf.reshape(image, shape=[xdim,zdim,nCh])
   image = tf.image.crop_to_bounding_box(tf.expand_dims(image, axis=0), 0, 0, crop_size[0], crop_size[1])
 
-  # normalize
-  image = tf.image.per_image_standardization(image)
-
-  # augment
-  image = tf.image.random_flip_up_down(image)
-  image = tf.image.random_flip_left_right(image)
-
   # parse lable
   c1 = parsed_features['label_c1']
   c2 = parsed_features['label_c2']
