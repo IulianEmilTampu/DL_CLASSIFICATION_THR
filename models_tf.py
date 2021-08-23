@@ -39,6 +39,7 @@ class LightOCT(object):
                     num_classes,
                     input_size,
                     data_augmentation=True,
+                    norm_layer=None,
                     class_weights=None,
                     kernel_size=(5,5),
                     model_name='LightOCT',
@@ -60,25 +61,28 @@ class LightOCT(object):
         # Create a data augmentation stage with normalization, horizontal flipping and rotations
         if data_augmentation is True:
             augmentor = tf.keras.Sequential([
-                    layers.experimental.preprocessing.Normalization(),
                     layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
                     layers.experimental.preprocessing.RandomRotation(0.02),
                     layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
-                    name='NormalizationAugmentationCropping')
+                    name='AugmentationAndCrop')
         else: # perform only normalization
             augmentor = tf.keras.Sequential([
-                    layers.experimental.preprocessing.Normalization(),
                     layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
-                    name='NormalizationCrop')
+                    name='Crop')
 
-        x = augmentor(inputs)
+        aug = augmentor(inputs)
+
+        if norm_layer is not None:
+            norm = norm_layer(aug)
+        else:
+            norm = aug
 
         # building LightOCT model
         x = Conv2D(filters=8,
                         kernel_size=self.kernel_size,
                         activation='relu',
                         padding='same',
-                        )(x)
+                        )(norm)
         x = MaxPooling2D(pool_size=(2,2),
                         strides=2
                         )(x)

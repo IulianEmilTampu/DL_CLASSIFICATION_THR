@@ -516,7 +516,6 @@ def train(self, training_dataloader,
                     # backpropagation.
                     train_loss = classification_loss
 
-            before_gradient = self.model.trainable_variables[-2][:,:,0:50,:]
 
             # Use the gradient tape to automatically retrieve
             # the gradients of the trainable variables with respect to the loss.
@@ -525,19 +524,9 @@ def train(self, training_dataloader,
                 #                       unconnected_gradients=tf.UnconnectedGradients.ZERO)
                 grads = tape.gradient(train_loss, self.model.trainable_variables,
                                       unconnected_gradients=tf.UnconnectedGradients.ZERO)
-                grad = grads[-2][:,:,0:50,:]
             else:
                 # grads = tape.gradient(train_loss, self.model.trainable_weights)
                 grads = tape.gradient(train_loss, self.model.trainable_variables)
-                grad = grads[-2][:,:,0:50,:]
-
-            after_gradient = self.model.trainable_variables[-2][:,:,0:50,:]
-
-            print(f'Gradient values: {grad}')
-            print(f'Variable before: {before_gradient}')
-            print(f'Variable after: {after_gradient}')
-            print(f'Delta (should be close to the gradient): {after_gradient - before_gradient}')
-            sys.exit()
 
             # save metrics
             epoch_train_loss.append(float(train_loss))
