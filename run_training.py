@@ -30,6 +30,7 @@ from sklearn.model_selection import KFold
 
 
 import tensorflow as tf
+import tensorflow.keras.layers as layers
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 import warnings
@@ -78,7 +79,7 @@ test_fold_summary = {}
 
 ## loop through the folds
 importlib.reload(utilities_models_tf)
-import tensorflow.keras.layers as layers
+
 # ############################ TRAINING
 for cv in range(config['N_FOLDS']):
     print('Working on fold {}/{}. Start time {}'.format(cv+1, config['N_FOLDS'], datetime.now().strftime("%H:%M:%S")))
@@ -95,6 +96,11 @@ for cv in range(config['N_FOLDS']):
                     buffer_size=5000,
                     crop_size=config['input_size'])
 
+    # set normalization layer on the training dataset
+    tr_feature_ds = train_dataset.map(lambda x, y: x)
+    normalizer = layers.experimental.preprocessing.Normalization()
+    normalizer.adapt(tr_feature_ds)
+
     val_dataset = utilities.TFR_2D_dataset(X_val,
                     dataset_type = 'train',
                     batch_size=config['batch_size'],
@@ -109,7 +115,8 @@ for cv in range(config['N_FOLDS']):
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
-                        input_size=config['input_size']
+                        input_size=config['input_size'],
+                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'M2':
         model = models_tf.M2(number_of_input_channels = 1,
@@ -117,7 +124,8 @@ for cv in range(config['N_FOLDS']):
                         num_classes = len(config['unique_labels']),
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
-                        kernel_size=config['kernel_size']
+                        kernel_size=config['kernel_size'],
+                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'M3':
         model = models_tf.M3(number_of_input_channels = 1,
@@ -125,14 +133,16 @@ for cv in range(config['N_FOLDS']):
                         num_classes = len(config['unique_labels']),
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
-                        kernel_size=config['kernel_size']
+                        kernel_size=config['kernel_size'],
+                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'ResNet50':
         model = models_tf.ResNet50(number_of_input_channels = 1,
                         model_name=config['model_configuration'],
                         num_classes = len(config['unique_labels']),
                         data_augmentation=config['data_augmentation'],
-                        class_weights = config['class_weights']
+                        class_weights = config['class_weights'],
+                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'InceptionV3':
         model = models_tf.InceptionV3(number_of_input_channels = 1,
@@ -140,7 +150,8 @@ for cv in range(config['N_FOLDS']):
                         num_classes = len(config['unique_labels']),
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
-                        input_size=config['input_size']
+                        input_size=config['input_size'],
+                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'VAE_original':
         model = models_tf.VAE_original(number_of_input_channels = 1,
@@ -150,7 +161,8 @@ for cv in range(config['N_FOLDS']):
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size'],
-                        vae_latent_dim=config['vae_latent_dim']
+                        vae_latent_dim=config['vae_latent_dim'],
+                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'VAE1':
         model = models_tf.VAE1(number_of_input_channels = 1,
@@ -159,7 +171,8 @@ for cv in range(config['N_FOLDS']):
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
-                        input_size=config['input_size']
+                        input_size=config['input_size'],
+                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'VAE2':
         model = models_tf.VAE2(number_of_input_channels = 1,
@@ -168,7 +181,8 @@ for cv in range(config['N_FOLDS']):
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
-                        input_size=config['input_size']
+                        input_size=config['input_size'],
+                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'VAE3':
         model = models_tf.VAE3(number_of_input_channels = 1,
@@ -177,7 +191,8 @@ for cv in range(config['N_FOLDS']):
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
-                        input_size=config['input_size']
+                        input_size=config['input_size'],
+                        norm_layer=normalizer
                         )
     else:
         model = models_tf.LightOCT(number_of_input_channels = 1,
@@ -186,7 +201,8 @@ for cv in range(config['N_FOLDS']):
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
-                        input_size=config['input_size']
+                        input_size=config['input_size'],
+                        norm_layer=normalizer
                         )
 
     # train model
