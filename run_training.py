@@ -98,7 +98,7 @@ for cv in range(config['N_FOLDS']):
 
     # set normalization layer on the training dataset
     tr_feature_ds = train_dataset.map(lambda x, y: x)
-    normalizer = layers.experimental.preprocessing.Normalization()
+    normalizer = layers.experimental.preprocessing.Normalization(axis=-1)
     normalizer.adapt(tr_feature_ds)
 
     val_dataset = utilities.TFR_2D_dataset(X_val,

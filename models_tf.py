@@ -418,6 +418,7 @@ class VAE_original(object):
                     num_classes,
                     input_size,
                     data_augmentation=True,
+                    norm_layer=None,
                     class_weights=None,
                     kernel_size=(5,5),
                     model_name='VAE',
@@ -442,19 +443,22 @@ class VAE_original(object):
 
         # Create a data augmentation stage with normalization, horizontal flipping and rotations
         if data_augmentation is True:
-            augmentor = tf.keras.Sequential(
-                [
-                    layers.experimental.preprocessing.Normalization(),
+            augmentor = tf.keras.Sequential([
                     layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-                    layers.experimental.preprocessing.RandomRotation(0.02)],
-                    name='NormalizationAugmentation'
-            )
+                    layers.experimental.preprocessing.RandomRotation(0.02),
+                    layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
+                    name='AugmentationAndCrop')
         else: # perform only normalization
-            augmentor = tf.keras.Sequential([layers.experimental.preprocessing.Normalization()],name='Normalization')
+            augmentor = tf.keras.Sequential([
+                    layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
+                    name='Crop')
 
-        x = augmentor(inputs)
+        aug = augmentor(inputs)
 
-        augmented_norm = x
+        if norm_layer is not None:
+            augmented_norm = norm_layer(aug)
+        else:
+            augmented_norm = aug
 
         # build sampler
         class Sampling(tf.keras.layers.Layer):
@@ -474,7 +478,7 @@ class VAE_original(object):
         # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤   conv block 1
         y = Conv2D(filters=32,
                     kernel_size=self.kernel_size,
-                    padding='same')(x)
+                    padding='same')(augmented_norm)
         x = tfa.layers.GroupNormalization(groups=int(32/4))(y)
         x = tf.keras.layers.ReLU()(x)
         x = Conv2D(filters=32,
@@ -595,6 +599,7 @@ class VAE1(object):
                     num_classes,
                     input_size,
                     data_augmentation=True,
+                    norm_layer=None,
                     class_weights=None,
                     kernel_size=(5,5),
                     model_name='VAE1',
@@ -619,18 +624,22 @@ class VAE1(object):
 
         # Create a data augmentation stage with normalization, horizontal flipping and rotations
         if data_augmentation is True:
-            augmentor = tf.keras.Sequential(
-                [
-                    layers.experimental.preprocessing.Normalization(),
+            augmentor = tf.keras.Sequential([
                     layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-                    layers.experimental.preprocessing.RandomRotation(0.02)], name='NormalizationAugmentation'
-            )
+                    layers.experimental.preprocessing.RandomRotation(0.02),
+                    layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
+                    name='AugmentationAndCrop')
         else: # perform only normalization
-            augmentor = tf.keras.Sequential([layers.experimental.preprocessing.Normalization()],name='Normalization')
+            augmentor = tf.keras.Sequential([
+                    layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
+                    name='Crop')
 
-        x = augmentor(inputs)
+        aug = augmentor(inputs)
 
-        augmented_norm = x
+        if norm_layer is not None:
+            augmented_norm = norm_layer(aug)
+        else:
+            augmented_norm = aug
 
         # build sampler
         class Sampling(tf.keras.layers.Layer):
