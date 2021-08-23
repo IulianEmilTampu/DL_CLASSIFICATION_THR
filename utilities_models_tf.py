@@ -80,9 +80,9 @@ def fix_labels_v2(labels, classification_type, unique_labels, categorical=True):
                     # break
     if categorical == True:
         # convert labels to categorical
-        return to_categorical(labels, num_classes=len(unique_labels))
+        return tf.convert_to_tensor(to_categorical(labels, num_classes=len(unique_labels)), dtype=tf.float32)
     else:
-        return labels
+        return tf.convert_to_tensor(labels, dtype=tf.float32)
 
 
 def leraningRateScheduler(lr_start, current_epoch, max_epochs, power):
@@ -453,7 +453,7 @@ def train(self, training_dataloader,
             step += 1
 
             # make data usable
-            x = x.numpy()
+            # x = x.numpy()
             y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels)
 
             # save information about training image size
@@ -464,6 +464,9 @@ def train(self, training_dataloader,
             # Open a GradientTape to record the operations run
             # during the forward pass, which enables autodifferentiation.
             with tf.GradientTape() as tape:
+                # print(f'Input type and shape: {type(x)} - {x.shape}')
+                # print(f'GT type and shape: {type(y)} - {y.shape}')
+                # sys.exit()
                 # Logits for this minibatch
                 if 'VAE' in self.model_name:
                     train_logits, reconstruction, augmented_norm, z_mean, z_log_var, z = self.model(x, training=True)
@@ -513,6 +516,28 @@ def train(self, training_dataloader,
                     # backpropagation.
                     train_loss = classification_loss
 
+            before_gradient = self.model.trainable_variables[-2][:,:,0:50,:]
+
+            # Use the gradient tape to automatically retrieve
+            # the gradients of the trainable variables with respect to the loss.
+            if 'VAE' in self.model_name:
+                # grads = tape.gradient(train_loss, self.model.trainable_weights,
+                #                       unconnected_gradients=tf.UnconnectedGradients.ZERO)
+                grads = tape.gradient(train_loss, self.model.trainable_variables,
+                                      unconnected_gradients=tf.UnconnectedGradients.ZERO)
+                grad = grads[-2][:,:,0:50,:]
+            else:
+                # grads = tape.gradient(train_loss, self.model.trainable_weights)
+                grads = tape.gradient(train_loss, self.model.trainable_variables)
+                grad = grads[-2][:,:,0:50,:]
+
+            after_gradient = self.model.trainable_variables[-2][:,:,0:50,:]
+
+            print(f'Gradient values: {grad}')
+            print(f'Variable before: {before_gradient}')
+            print(f'Variable after: {after_gradient}')
+            print(f'Delta (should be close to the gradient): {after_gradient - before_gradient}')
+            sys.exit()
 
             # save metrics
             epoch_train_loss.append(float(train_loss))
@@ -520,14 +545,6 @@ def train(self, training_dataloader,
             train_f1 = f1Score(y, train_logits)
             epoch_train_acc.append(float(train_acc))
             epoch_train_f1.append(float(train_f1))
-
-            # Use the gradient tape to automatically retrieve
-            # the gradients of the trainable variables with respect to the loss.
-            if 'VAE' in self.model_name:
-                grads = tape.gradient(train_loss, self.model.trainable_weights,
-                                      unconnected_gradients=tf.UnconnectedGradients.ZERO)
-            else:
-                grads = tape.gradient(train_loss, self.model.trainable_weights)
 
             # Run one step of gradient descent by updating
             # the value of the variables to minimize the loss.
@@ -537,17 +554,19 @@ def train(self, training_dataloader,
             if self.verbose == 2:
                 if epoch == 0:
                     print('\r', end='')
-                    print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
-                            .format(epoch+1, step, train_loss, train_acc, train_f1),end='')
+                    # print('Epoch {:04d} training (counting training steps) -> {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
+                    #         .format(epoch+1, step, train_loss, train_acc, train_f1),end='')
+                    print(f'Epoch {epoch+1:04d} training (counting training steps) -> {step:04d} -> tr_loss:{train_loss:.4f}, tr_acc:{train_acc:.4f}, tr_f1:{train_f1:.4f} \r',end='')
                 else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
-                            .format(epoch+1,
-                                    step,
-                                    self.num_training_samples//self.batch_size,
-                                    train_loss,
-                                    train_acc,
-                                    train_f1)
-                            ,end='')
+                    # print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
+                    #         .format(epoch+1,
+                    #                 step,
+                    #                 self.num_training_samples//self.batch_size,
+                    #                 train_loss,
+                    #                 train_acc,
+                    #                 train_f1)
+                    #         ,end='')
+                    print(f'Epoch {epoch+1:04d} training -> {step:04d}/{self.num_training_samples//self.batch_size:04d} -> tr_loss:{train_loss:.4f}, tr_acc:{train_acc:.4f}, tr_f1:{train_f1:.4f} \r',end='')
 
         # finisced all the training batches -> save training loss
         self.train_loss_history.append(np.mean(np.array(epoch_train_loss), axis=0))
@@ -561,8 +580,8 @@ def train(self, training_dataloader,
         for x, y in validation_dataloader:
             step += 1
 
-            # make data usable
             x = x.numpy()
+            # fix labels based on usique_label specification
             y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels)
 
             # logits for this validation batch
@@ -589,7 +608,7 @@ def train(self, training_dataloader,
                     sfce = tfa.losses.SigmoidFocalCrossEntropy(from_logits=True)
                     classification_loss = tf.reduce_mean(sfce(y, val_logits))
                 else:
-                    raise TypeError('Invalid loss. given {} but expected cee, wcce or sfce'.format(l))
+                    raise TypeError(f'Invalid loss. given {l} but expected cee, wcce or sfce')
 
             if 'VAE' in self.model_name:
                 # reconstruction loss
@@ -619,13 +638,15 @@ def train(self, training_dataloader,
             if self.verbose == 2:
                 if epoch == 0:
                     print('\r', end='')
-                    print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f} \r'
-                            .format(epoch+1, step, val_loss, val_acc, val_f1),
-                            end='')
+                    # print('Epoch {:04d} validation (counting validation steps) -> {:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f} \r'
+                    #         .format(epoch+1, step, val_loss, val_acc, val_f1),
+                    #         end='')
+                    print(f'Epoch {epoch+1:04d} validation (counting validation steps) -> {step:04d} -> val_loss:{val_loss:.4f}, val_acc:{val_acc:.4f}, val_f1:{val_f1:.4f} \r', end='')
                 else:
-                    print('Epoch {:04d} validation -> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f} \r'
-                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc, val_f1),
-                            end='')
+                    # print('Epoch {:04d} validation -> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f} \r'
+                    #         .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_loss, val_acc, val_f1),
+                    #         end='')
+                    print(f'Epoch {epoch+1:04d} validation -> {step:04d}/{self.num_validation_samples//self.batch_size:04d} -> val_loss:{val_loss:.4f}, val_acc:{val_acc:.4f}, val_f1:{val_f1:.4f} \r', end='')
 
 
         # finisced all the batches in the validation
@@ -669,7 +690,7 @@ def train(self, training_dataloader,
             if self.val_f1_history[-1] > self.best_f1:
                 # save model checkpoint
                 if self.verbose == 1 or self.verbose == 2:
-                    print(' - Saving model checkpoint in {}'.format(self.save_model_path))
+                    print(f' - Saving model checkpoint in {self.save_model_path}')
                 # save some extra parameters
 
                 stop = time.time()
@@ -689,7 +710,7 @@ def train(self, training_dataloader,
             # check max waiting is reached
             if n_wait == patience:
                 if self.verbose == 1 or self.verbose == 2:
-                    print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
+                    print(f' -  Early stopping patient reached. Last model saved in {self.save_model_path}')
                 break
 
 def test(self, test_dataloader):
@@ -738,7 +759,7 @@ def test(self, test_dataloader):
         test_logits = tf.concat([test_logits, aus_logits], axis=0)
 
     test_stop = time.time()
-    print('Model accuracy: {:.02f}'.format(accuracy(test_gt, test_logits)))
+    print(f'Model accuracy: {accuracy(test_gt, test_logits):.02f}')
 
     # return test predictions
     return test_gt, test_logits, test_stop-test_start

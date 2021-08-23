@@ -381,25 +381,50 @@ for c in per_class_file_names:
 #     for v in per_class_unique_volumes[i]:
 #         print(v)
 
-##
+# # 2
+# kf = KFold(n_splits=N_FOLDS)
+# per_fold_train_files = [[] for i in range(N_FOLDS)]
+# per_fold_val_files = [[] for i in range(N_FOLDS)]
+#
+# for idx1, c in enumerate(per_class_unique_volumes):
+#     # for all classes
+#     for idx, (train_volume_index, val_volume_index) in enumerate(kf.split(c)):
+#         # use the indexes of the unique volumes for split the data
+#         # training
+#         for v in train_volume_index:
+#             tr_vol = c[v]
+#             per_fold_train_files[idx].extend([f for f in train_val_filenames if tr_vol in f])
+#         # validation
+#         for v in val_volume_index:
+#             val_vol = c[v]
+#             # print(f'Fold {idx} - Validation: {val_vol}')
+#             per_fold_val_files[idx].extend([f for f in train_val_filenames if val_vol in f])
+#
+# # shuffle training files (since that there can be many files, the buffer size
+# # for the generator should be very large. By shuffling now we can reduce the
+# # buffer size).
+#
+# for c in range(N_FOLDS):
+#     random.shuffle(per_fold_train_files[c])
+#     random.shuffle(per_fold_val_files[c])
+#
+# # check that the split is valid
+# for c in range(N_FOLDS):
+#     for tr_f in per_fold_train_files[c]:
+#         if tr_f in per_fold_val_files[c]:
+#             print(f'File {os.path.basename(tr_f)} in both set for fold {c}')
+#             raise ValueError('Train validation split did not go as planned \n Some training file are in the validation set. Check implementation')
+
+
 # 2
 kf = KFold(n_splits=N_FOLDS)
 per_fold_train_files = [[] for i in range(N_FOLDS)]
 per_fold_val_files = [[] for i in range(N_FOLDS)]
 
-for idx1, c in enumerate(per_class_unique_volumes):
-    # for all classes
-    for idx, (train_volume_index, val_volume_index) in enumerate(kf.split(c)):
-        # use the indexes of the unique volumes for split the data
-        # training
-        for v in train_volume_index:
-            tr_vol = c[v]
-            per_fold_train_files[idx].extend([f for f in train_val_filenames if tr_vol in f])
-        # validation
-        for v in val_volume_index:
-            val_vol = c[v]
-            # print(f'Fold {idx} - Validation: {val_vol}')
-            per_fold_val_files[idx].extend([f for f in train_val_filenames if val_vol in f])
+
+for idx, (tr_index, val_index) in enumerate(kf.split(train_val_filenames)):
+    per_fold_train_files[idx] = [train_val_filenames[i] for i in tr_index]
+    per_fold_val_files[idx] = [train_val_filenames[i] for i in val_index]
 
 # shuffle training files (since that there can be many files, the buffer size
 # for the generator should be very large. By shuffling now we can reduce the
@@ -415,7 +440,6 @@ for c in range(N_FOLDS):
         if tr_f in per_fold_val_files[c]:
             print(f'File {os.path.basename(tr_f)} in both set for fold {c}')
             raise ValueError('Train validation split did not go as planned \n Some training file are in the validation set. Check implementation')
-
 
 print(f'Cross-validation set. Running a {N_FOLDS}-fold cross validation')
 print(f'Images from the validation set are taken from volumes not in the training sets')
