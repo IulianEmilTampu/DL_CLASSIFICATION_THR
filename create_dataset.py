@@ -119,6 +119,28 @@ def tictoc(tic=0, toc=1):
 
     return "%2dd:%02dh:%02dm:%02ds:%02dms" % (days, hours, minutes, seconds, milliseconds)
 
+def data_normalization(dataset, quantile=0.995):
+    '''
+    Normalizes the data between [-1,1] using the specified quantile value.
+    Note that the data that falls outside the [-1, 1] interval is not clipped,
+    thus there will be values outside the normalization interval
+
+    Using the formula:
+
+        x_norm = 2*(x - x_min)/(x_max - x_min) - 1
+
+    where
+    x_norm:     normalized data in the [-1, 1] interval
+    x:          data to normalize
+    x_min:      min value based on the specified quantile
+    x_max:      max value based on the specified quantile
+    '''
+
+    x_min = np.quantile(dataset, 1-quantile)
+    x_max = np.quantile(dataset, quantile)
+
+    return 2.0*(dataset.astype('float32') - x_min)/(x_max - x_min) - 1.0
+
 def resample_image(img, img_res, iso_res):
     from skimage.transform import resize
     '''
@@ -276,11 +298,11 @@ What we need to parce is
 # dataset_specs = args.dataset_specs
 
 # parse variables
-data_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/Raw_OCT_data'
-destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/remaining'
+data_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/raw_data'
+destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/'
 spatial_size = [1.4, 2.0]
 isotropic_res = 0.007
-dataset_specs = '/flush/iulta54/Research/P3-THR_DL/volumewise_annotations_refined_v4.csv'
+dataset_specs = '/flush/iulta54/Research/P3-THR_DL/annotation_information.csv'
 
 
 
@@ -420,6 +442,9 @@ for counter, f in enumerate(files):
     volume_data = volume_data[0:int(np.ceil(spatial_size[0]/anisotropic_res[0])),
                               0:int(np.ceil(spatial_size[1]/anisotropic_res[1])),
                               :]
+    # normalise volume in [-1,1] using 98% percentile
+    volume_data = data_normalization(volume_data, quantile=0.98)
+
     log_dict['Final_anisotropic_image_shape'] = volume_data.shape[0:2]
 
     # ## save every 2D anisotropic b-scan as .nii and TFR
@@ -547,8 +572,6 @@ logfile.close()
 
 print('\n')
 print(f'Dataset preparation took {total_time}. It is now available at {destination_folder}')
-
-
 
 
 
