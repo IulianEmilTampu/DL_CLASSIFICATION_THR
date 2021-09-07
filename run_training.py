@@ -24,10 +24,6 @@ import nibabel as nib
 from random import shuffle
 from datetime import datetime
 import matplotlib.pyplot as plt
-from operator import itemgetter
-from shutil import copyfile, move
-from sklearn.model_selection import KFold
-
 
 import tensorflow as tf
 import tensorflow.keras.layers as layers
@@ -43,14 +39,17 @@ import utilities_models_tf
 
 ## parse the configuration file
 
-parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification. It uses the configuration file created using the configure_training.py file. Run the configuration first!')
+# parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification. It uses the configuration file created using the configure_training.py file. Run the configuration first!')
+#
+# parser.add_argument('-cf','--configuration_file' ,required=True, help='Provide the path to the configuration file generated using the configure_training.py script.')
+# parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 15 epochs with 10 early stop patience).', default=False)
+# args = parser.parse_args()
+#
+# configuration_file = args.configuration_file
+# debug = bool(args.debug)
 
-parser.add_argument('-cf','--configuration_file' ,required=True, help='Provide the path to the configuration file generated using the configure_training.py script.')
-parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 15 epochs with 10 early stop patience).', default=False)
-args = parser.parse_args()
-
-configuration_file = args.configuration_file
-debug = bool(args.debug)
+configuration_file = '/flush/iulta54/Research/P3-THR_DL/trained_models/LightOCT_rollback/config.json'
+debug = False
 
 if not os.path.isfile(configuration_file):
     raise ValueError(f'Configuration file not found. Run the configure_training.py script first. Given {configuration_file}')
@@ -60,9 +59,9 @@ if debug is True:
     print(f'{"Running training routine in debug mode (using less data and lower number of epochs)":^20}')
     print(f'{"-"*83}\n')
 else:
-    print(f'{"-"*20}')
+    print(f'{"-"*24}')
     print(f'{"Running training routine":^20}')
-    print(f'{"-"*20}\n')
+    print(f'{"-"*24}\n')
 
 with open(configuration_file) as json_file:
     config = json.load(json_file)
@@ -96,13 +95,14 @@ for cv in range(config['N_FOLDS']):
                     buffer_size=5000,
                     crop_size=config['input_size'])
 
-    # set normalization layer on the training dataset
-    tr_feature_ds = train_dataset.map(lambda x, y: x)
-    normalizer = layers.experimental.preprocessing.Normalization(axis=-1)
-    normalizer.adapt(tr_feature_ds)
+    # # set normalization layer on the training dataset
+    # tr_feature_ds = train_dataset.map(lambda x, y: x)
+    # normalizer = layers.experimental.preprocessing.Normalization(axis=-1)
+    # normalizer.adapt(tr_feature_ds)
+    normalizer = None
 
     val_dataset = utilities.TFR_2D_dataset(X_val,
-                    dataset_type = 'train',
+                    dataset_type = 'test',
                     batch_size=config['batch_size'],
                     buffer_size=1000,
                     crop_size=config['input_size'])
@@ -122,6 +122,7 @@ for cv in range(config['N_FOLDS']):
         model = models_tf.M2(number_of_input_channels = 1,
                         model_name='M2',
                         num_classes = len(config['unique_labels']),
+                        input_size=config['input_size'],
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
@@ -208,41 +209,76 @@ for cv in range(config['N_FOLDS']):
     # train model
     print(' - Training fold...')
     if debug is True:
-        utilities_models_tf.train(model,
-                        train_dataset, val_dataset,
-                        classification_type =config['classification_type'],
-                        unique_labels = config['unique_labels'],
-                        loss=[config['loss']],
-                        start_learning_rate = config['learning_rate'],
-                        scheduler = 'polynomial',
-                        power = 0.1,
-                        vae_kl_weight=config['vae_kl_weight'],
-                        vae_reconst_weight=config['vae_reconst_weight'],
-                        max_epochs=20,
-                        early_stopping=True,
-                        patience=10,
-                        save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
-                        save_model_architecture_figure=True if cv==0 else False,
-                        verbose=config['verbose']
-                        )
+        if 'VAE' in config['model_configuration']:
+            print('TRAINING VAE')
+            utilities_models_tf.train_VAE(model,
+                            train_dataset, val_dataset,
+                            classification_type = config['classification_type'],
+                            unique_labels = config['unique_labels'],
+                            loss=[config['loss']],
+                            start_learning_rate = config['learning_rate'],
+                            scheduler = 'polynomial',
+                            vae_kl_weight=config['vae_kl_weight'],
+                            vae_reconst_weight=config['vae_reconst_weight'],
+                            power = 0.1,
+                            max_epochs=5,
+                            early_stopping=True,
+                            patience=5,
+                            save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
+                            save_model_architecture_figure=True if cv==0 else False,
+                            verbose=config['verbose']
+                            )
+        else:
+            utilities_models_tf.train(model,
+                            train_dataset, val_dataset,
+                            classification_type =config['classification_type'],
+                            unique_labels = config['unique_labels'],
+                            loss=[config['loss']],
+                            start_learning_rate = config['learning_rate'],
+                            scheduler = 'polynomial',
+                            power = 0.1,
+                            max_epochs=5,
+                            early_stopping=True,
+                            patience=1,
+                            save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
+                            save_model_architecture_figure=True if cv==0 else False,
+                            verbose=config['verbose']
+                            )
     else:
-        utilities_models_tf.train(model,
-                        train_dataset, val_dataset,
-                        classification_type =config['classification_type'],
-                        unique_labels = config['unique_labels'],
-                        loss=[config['loss']],
-                        start_learning_rate = config['learning_rate'],
-                        scheduler = 'polynomial',
-                        power = 0.1,
-                        vae_kl_weight=config['vae_kl_weight'],
-                        vae_reconst_weight=config['vae_reconst_weight'],
-                        max_epochs=200,
-                        early_stopping=True,
-                        patience=20,
-                        save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
-                        save_model_architecture_figure=True if cv==0 else False,
-                        verbose=config['verbose']
-                        )
+        if 'VAE' in config['model_configuration']:
+            utilities_models_tf.train_VAE(model,
+                            train_dataset, val_dataset,
+                            classification_type =config['classification_type'],
+                            unique_labels = config['unique_labels'],
+                            loss=[config['loss']],
+                            start_learning_rate = config['learning_rate'],
+                            scheduler = 'polynomial',
+                            vae_kl_weight=config['vae_kl_weight'],
+                            vae_reconst_weight=config['vae_reconst_weight'],
+                            power = 0.1,
+                            max_epochs=500,
+                            early_stopping=True,
+                            patience=500,
+                            save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
+                            save_model_architecture_figure=True if cv==0 else False,
+                            verbose=config['verbose']
+                            )
+        else:
+            utilities_models_tf.train(model,
+                            train_dataset, val_dataset,
+                            classification_type =config['classification_type'],
+                            unique_labels = config['unique_labels'],
+                            loss=[config['loss']],
+                            start_learning_rate = config['learning_rate'],
+                            scheduler = 'polynomial',
+                            power = 0.1,
+                            max_epochs=500,
+                            early_stopping=True,
+                            patience=500,
+                            save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
+                            save_model_architecture_figure=True if cv==0 else False,
+                            verbose=config['verbose']
+                            )
 
     # test model
     print(' - Testing fold...')
@@ -251,7 +287,8 @@ for cv in range(config['N_FOLDS']):
                     batch_size=config['batch_size'],
                     buffer_size=1000,
                     crop_size=config['input_size'])
-##
+
+
     importlib.reload(utilities_models_tf)
     test_gt, test_prediction, test_time = utilities_models_tf.test(model, test_dataset)
     test_fold_summary[cv]={

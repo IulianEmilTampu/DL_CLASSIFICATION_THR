@@ -125,7 +125,9 @@ class M2(object):
     '''
     def __init__(self, number_of_input_channels,
                     num_classes,
+                    input_size,
                     data_augmentation=True,
+                    norm_layer=None,
                     class_weights=None,
                     kernel_size=(5,5),
                     model_name='M2',
@@ -146,19 +148,25 @@ class M2(object):
         # Create a data augmentation stage with normalization, horizontal flipping and rotations
         if data_augmentation is True:
             augmentor = tf.keras.Sequential([
-                    layers.experimental.preprocessing.Normalization(),
                     layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-                    layers.experimental.preprocessing.RandomRotation(0.02)],
-                    name='NormalizationAugmentation')
+                    layers.experimental.preprocessing.RandomRotation(0.02),
+                    layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
+                    name='AugmentationAndCrop')
         else: # perform only normalization
             augmentor = tf.keras.Sequential([
-                    layers.experimental.preprocessing.Normalization()],
-                    name='Normalization')
+                    layers.experimental.preprocessing.RandomCrop(input_size[0], input_size[0])],
+                    name='Crop')
 
-        x = augmentor(inputs)
+        aug = augmentor(inputs)
+
+        if norm_layer is not None:
+            norm = norm_layer(aug)
+        else:
+            norm = aug
 
         # build model
         n_filters = [32, 64, 128]
+        x = norm
         for i in n_filters:
             x = Conv2D(filters=i,
                         kernel_size=self.kernel_size)(x)
@@ -168,14 +176,15 @@ class M2(object):
                         strides=2
                         )(x)
 
-        x = layers.SpatialDropout2D(0.2)(x)
-        x = Conv2D(filters = self.num_classes,
-                   kernel_size=self.kernel_size)(x)
+        # classifier
+        # x = layers.SpatialDropout2D(0.2)(x)
+        # x = Conv2D(self.num_classes, [5,5], padding='same', activation='relu')(x)
+        # final = layers.GlobalMaxPooling2D()(x)
         x = GlobalMaxPooling2D()(x)
-        # x = Dropout(rate=0.2)(x)
-        # x = Dense(units=60, activation='relu')(x)
-        # final = Dense(units=self.num_classes, activation='softmax')(x)
-        final = layers.Softmax()(x)
+        x = Dropout(0.3)(x)
+        x = Dense(32, activation='relu')(x)
+        # x = Dropout(0.2)(x)
+        final = Dense(self.num_classes, activation='softmax')(x)
 
         # save model paramenters
         self.num_filter_start = n_filters[0]
@@ -245,11 +254,16 @@ class M3(object):
             x = MaxPooling2D(pool_size=(2,2),
                         strides=2
                         )(x)
-        # FCN
+
+        # classifier
+        # x = layers.SpatialDropout2D(0.2)(x)
+        # x = Conv2D(self.num_classes, [5,5], padding='same', activation='relu')(x)
+        # final = layers.GlobalMaxPooling2D()(x)
         x = GlobalMaxPooling2D()(x)
-        x = Dropout(rate=0.2)(x)
-        x = Dense(units=60, activation='relu')(x)
-        final = Dense(units=self.num_classes, activation='softmax')(x)
+        x = Dropout(0.3)(x)
+        x = Dense(32, activation='relu')(x)
+        # x = Dropout(0.2)(x)
+        final = Dense(self.num_classes, activation='softmax')(x)
 
         # save model paramenters
         self.num_filter_start = n_filters[0]
@@ -558,13 +572,32 @@ class VAE_original(object):
 
         # build decoder
         aus_dim = [int(self.input_size[0] / 2**3), int(self.input_size[1] / 2**3)]
-        x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim, activation='relu')(z)
-        x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],128))(x)
-        x = tf.keras.layers.Conv2DTranspose(128, 5, activation='relu', strides=2, padding='same')(x)
-        x = tf.keras.layers.Conv2DTranspose(64, 5, activation='relu', strides=2, padding='same')(x)
-        x = tf.keras.layers.Conv2DTranspose(32, 5, activation='relu', strides=2, padding='same')(x)
+        # x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim, activation='relu')(z)
+        # x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],self.vae_latent_dim))(x)
+        # x = tf.keras.layers.Conv2DTranspose(128, 3, activation='relu', strides=2, padding='same')(x)
+        # x = tf.keras.layers.Conv2DTranspose(64, 3, activation='relu', strides=2, padding='same')(x)
+        # x = tf.keras.layers.Conv2DTranspose(32, 3, activation='relu', strides=2, padding='same')(x)
+        #
+        # decoder_outputs = tf.keras.layers.Conv2DTranspose(self.number_of_input_channels,5, activation='tanh', padding='same')(x)
 
-        decoder_outputs = tf.keras.layers.Conv2DTranspose(1,5,activation='tanh', padding='same')(x)
+        def resize_convolution(x, final_shape, filters):
+            upsample = tf.image.resize(images=x,
+                                            size=final_shape,
+                                            method=tf.image.ResizeMethod.BILINEAR)
+            up_conv = Conv2D(filters=filters,
+                            kernel_size=3,
+                            padding='same',
+                            activation='relu')(upsample)
+            return up_conv
+
+        x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim)(z)
+        x = tf.keras.layers.LeakyReLU()(x)
+        x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],self.vae_latent_dim))(x)
+        x = resize_convolution(x, final_shape=(aus_dim[0]*2, aus_dim[0]*2), filters=128)
+        x = resize_convolution(x, final_shape=(aus_dim[0]*4, aus_dim[0]*4), filters=64)
+        x = resize_convolution(x, final_shape=(aus_dim[0]*8, aus_dim[0]*8), filters=32)
+        decoder_outputs = Conv2D(self.number_of_input_channels, 5, activation='tanh', padding='same')(x)
+
         self.model = Model(inputs=inputs, outputs=[pred, decoder_outputs, augmented_norm, z_mean, z_log_var, z], name=model_name)
 
         # save model paramenters
@@ -657,6 +690,7 @@ class VAE1(object):
 
         # CNN encoder
         n_filters = [32,64]
+        x = augmented_norm
         for i in n_filters:
             x = Conv2D(filters=i,
                         kernel_size=kernel_size)(x)

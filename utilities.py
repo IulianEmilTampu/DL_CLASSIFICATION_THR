@@ -2,6 +2,7 @@ import os
 import cv2
 import math
 import time
+import random
 import numbers
 import itertools
 import numpy as np
@@ -16,7 +17,6 @@ from tensorflow.keras.models import Model
 # Ignore warnings
 import warnings
 warnings.filterwarnings("ignore")
-
 
 def to_one_hot(y, n_dims=None):
     """ Take integer y (tensor or variable) with n dims and convert it to 1-hot representation with n+1 dims. """
@@ -36,7 +36,7 @@ def get_organized_files(file_names, classification_type,
     '''
     Utility that given a list of file names using the convention described in
     the create_dataset_v2.py script, returns three things:
-    1 - list of files that does not contain the file smarked as to be excluded
+    1 - list of files that does not contain the file marked as to be excluded (9)
     2 - list of labels corresponding to the files above (categprical or not)
     3 - a list of lists that contains the files organised per aggregation class
 
@@ -627,7 +627,50 @@ def show_batch_2D(sample_batched, title=None, img_per_row=10):
         fig.suptitle('Batch of data', fontsize=20)
     plt.show()
 
+# Helper function to show a batch
+def show_batch_2D_with_histogram(sample_batched, title=None):
 
+    from mpl_toolkits.axes_grid1 import ImageGrid
+    from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+    """
+    Creates a grid of images with the samples contained in a batch of data.
+    Here showing 5 random examples along with theirplt histogram.
+
+    Parameters
+    ----------
+    sample_batch : tuple
+        COntains the actuall images (sample_batch[0]) and their label
+        (sample_batch[1]).
+    title : str
+        Title of the created image
+    img_per_row : int
+        number of images per row in the created grid of images.
+    """
+    n_images_to_show = 5
+    index_samples = random.sample(range(len(sample_batched[0])), n_images_to_show)
+
+    # make figure grid
+    fig , ax = plt.subplots(nrows=2, ncols=n_images_to_show, figsize=(15,10))
+
+    # fill in the axis with the images and histograms
+    for i, img_idx in zip(range(n_images_to_show),index_samples) :
+        img = np.squeeze(sample_batched[0][img_idx,:,:])
+        ax[0][i].imshow(img, cmap='gray', interpolation=None)
+        ax[0][i].set_xticks([])
+        ax[0][i].set_yticks([])
+        ax[0][i].set_title(sample_batched[1][img_idx])
+
+        # add histogram
+        ax[1][i].hist(img.flatten(), bins=256)
+        # ax[1][i].set_xlim([-1.1,1.1])
+    if title:
+        fig.suptitle(title, fontsize=20)
+    else:
+        fig.suptitle('Batch of data', fontsize=20)
+
+    plt.show()
+
+##
 
 '''
 Grad-CAM implementation [1] as described in post available at [2].
@@ -784,5 +827,27 @@ class gradCAM:
         # return both the heatmap and the overlayed output
         return (heatmap, output)
 
+## normalization
 
+def data_normalization(dataset, quantile=0.995):
+    '''
+    Normalizes the data between [-1,1] using the specified quantile value.
+    Note that the data that falls outside the [-1, 1] interval is not clipped,
+    thus there will be values outside the normalization interval
+
+    Using the formula:
+
+        x_norm = 2*(x - x_min)/(x_max - x_min) - 1
+
+    where
+    x_norm:     normalized data in the [-1, 1] interval
+    x:          data to normalize
+    x_min:      min value based on the specified quantile
+    x_max:      max value based on the specified quantile
+    '''
+
+    x_min = np.quantile(dataset, 1-quantile)
+    x_max = np.quantile(dataset, quantile)
+
+    return 2.0*(dataset.astype('float32') - x_min)/(x_max - x_min) - 1.0
 
