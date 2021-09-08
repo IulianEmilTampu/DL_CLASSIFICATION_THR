@@ -39,17 +39,17 @@ import utilities_models_tf
 
 ## parse the configuration file
 
-# parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification. It uses the configuration file created using the configure_training.py file. Run the configuration first!')
-#
-# parser.add_argument('-cf','--configuration_file' ,required=True, help='Provide the path to the configuration file generated using the configure_training.py script.')
-# parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 15 epochs with 10 early stop patience).', default=False)
-# args = parser.parse_args()
-#
-# configuration_file = args.configuration_file
-# debug = bool(args.debug)
+parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification. It uses the configuration file created using the configure_training.py file. Run the configuration first!')
 
-configuration_file = '/flush/iulta54/Research/P3-THR_DL/trained_models/LightOCT_rollback/config.json'
-debug = False
+parser.add_argument('-cf','--configuration_file' ,required=True, help='Provide the path to the configuration file generated using the configure_training.py script.')
+parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 15 epochs with 10 early stop patience).', default=False)
+args = parser.parse_args()
+
+configuration_file = args.configuration_file
+debug = args.debug == True
+
+# configuration_file = '/flush/iulta54/Research/P3-THR_DL/trained_models/LightOCT_rollback/config.json'
+# debug = False
 
 if not os.path.isfile(configuration_file):
     raise ValueError(f'Configuration file not found. Run the configure_training.py script first. Given {configuration_file}')
@@ -136,6 +136,14 @@ for cv in range(config['N_FOLDS']):
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
                         norm_layer=normalizer
+                        )
+    elif config['model_configuration'] == 'M4':
+        model = models_tf.M4(number_of_input_channels = 1,
+                        model_name=config['model_configuration'],
+                        num_classes = len(config['unique_labels']),
+                        data_augmentation=config['data_augmentation'],
+                        class_weights = config['class_weights'],
+                        kernel_size=config['kernel_size'],
                         )
     elif config['model_configuration'] == 'ResNet50':
         model = models_tf.ResNet50(number_of_input_channels = 1,
@@ -239,7 +247,7 @@ for cv in range(config['N_FOLDS']):
                             power = 0.1,
                             max_epochs=5,
                             early_stopping=True,
-                            patience=1,
+                            patience=5,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             verbose=config['verbose']

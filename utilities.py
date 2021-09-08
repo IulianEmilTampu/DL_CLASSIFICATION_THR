@@ -630,8 +630,6 @@ def show_batch_2D(sample_batched, title=None, img_per_row=10):
 # Helper function to show a batch
 def show_batch_2D_with_histogram(sample_batched, title=None):
 
-    from mpl_toolkits.axes_grid1 import ImageGrid
-    from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
     """
     Creates a grid of images with the samples contained in a batch of data.
     Here showing 5 random examples along with theirplt histogram.

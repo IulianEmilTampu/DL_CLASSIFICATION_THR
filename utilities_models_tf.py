@@ -423,7 +423,25 @@ def train(self, training_dataloader,
                 self.batch_size = x.shape[0]
                 self.input_size = (x.shape[1], x.shape[2])
 
+            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+            # import utilities
+            #
+            # y_, aug = self.model(x, training=True)
+            # utilities.show_batch_2D_with_histogram((aug.numpy(), y.numpy()))
+            # sys.exit()
+            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
             train_loss, grads = grad(self.model, x, y)
+
+            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+            # print(grads[-1])
+            #
+            # optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+            # train_loss, grads = grad(self.model, x, y)
+            # print(grads[-1])
+            #
+            # sys.exit()
+            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
 
             optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
 
@@ -437,15 +455,21 @@ def train(self, training_dataloader,
                 if epoch == 0:
                     print('\r', end='')
                     print('Epoch {:04d} training -> {:04d}/unknown -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f}\r'
-                            .format(epoch+1, step, tr_epoch_loss_avg.result(), tr_epoch_accuracy.result(), tr_epoch_f1.result()),end='')
+                            .format(epoch+1,
+                                step,
+                                tr_epoch_loss_avg.result(),
+                                tr_epoch_accuracy.result(),
+                                tr_epoch_f1.result()),
+                            end='')
                 else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f} \r'
+                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
                             .format(epoch+1,
                                     step,
                                     self.num_training_samples//self.batch_size,
                                     tr_epoch_loss_avg.result(),
-                                    tr_epoch_accuracy.result())
-                            ,end='')
+                                    tr_epoch_accuracy.result(),
+                                    tr_epoch_f1.result()),
+                            end='')
 
         # finisced all the training batches -> save training loss
         self.train_loss_history.append(tr_epoch_loss_avg.result().numpy().astype(float))
@@ -474,12 +498,21 @@ def train(self, training_dataloader,
             if self.verbose == 2:
                 if epoch == 0:
                     print('\r', end='')
-                    print('Epoch {:04d} validation -> {:04d}/unknown -> val_loss:{:.4f}, val_acc:{:.4f}\r'
-                            .format(epoch+1, step, val_epoch_accuracy.result(), val_epoch_accuracy.result()),
-                            end='')
+                    print('Epoch {:04d} validation -> {:04d}/unknown -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f}\r'
+                            .format(epoch+1,
+                                    step,
+                                    val_epoch_loss_avg.result(),
+                                    val_epoch_accuracy.result(),
+                                    val_epoch_f1.result()),
+                                end='')
                 else:
-                    print('Epoch {:04d} validation -> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f} \r'
-                            .format(epoch+1, step, self.num_validation_samples//self.batch_size, val_epoch_accuracy.result(), val_epoch_accuracy.result()),
+                    print('Epoch {:04d} validation -> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f}\r'
+                            .format(epoch+1,
+                                step,
+                                self.num_validation_samples//self.batch_size,
+                                val_epoch_loss_avg.result(),
+                                val_epoch_accuracy.result(),
+                                val_epoch_f1.result()),
                             end='')
 
 

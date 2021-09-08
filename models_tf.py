@@ -212,6 +212,7 @@ class M3(object):
                     num_classes,
                     data_augmentation=True,
                     class_weights=None,
+                    norm_layer=None,
                     kernel_size=(5,5),
                     model_name='M3',
                     debug=False):
@@ -241,6 +242,7 @@ class M3(object):
                     name='Normalization')
 
         x = augmentor(inputs)
+        aug = x
 
         # build model
         n_filters = [8, 32]
@@ -272,7 +274,96 @@ class M3(object):
         self.custom_model = False
 
         # finally make the model and return
+        # self.model = Model(inputs=inputs, outputs=[final, aug], name=model_name)
         self.model = Model(inputs=inputs, outputs=final, name=model_name)
+
+        # print model if needed
+        if self.debug is True:
+            print(self.model.summary())
+
+## Using multiple convs at the same time
+class M4(object):
+    '''
+   The encoder of the model uses dilated convolutions starting with with a 3x3
+   kernel and with three dilations 0, 1 and 2 (-> simulate a 3x3, 5x5 and 7x7).
+   The result is then concatenated along with the initial input and passed
+   through an activation function.
+    '''
+    def __init__(self, number_of_input_channels,
+                    num_classes,
+                    data_augmentation=True,
+                    class_weights=None,
+                    kernel_size=(5,5),
+                    model_name='M4',
+                    debug=False):
+
+        self.number_of_input_channels = number_of_input_channels
+        self.num_classes = num_classes
+        self.debug = debug
+        if class_weights is None:
+            self.class_weights = np.ones([1, self.num_classes])
+        else:
+            self.class_weights = class_weights
+
+        self.model_name = model_name
+        self.kernel_size=kernel_size
+
+        inputs = Input(shape=[None, None, self.number_of_input_channels])
+
+        # save augmented image to compute reconstruction
+        x = inputs
+
+        # build encoder with ResNet-like bloks
+        def Encoder_conv_block(inputs, n_filters):
+            '''
+            Takes the input and processes it through three a 3x3 kernel with
+            dilation of 0, 1 and 2 (simulating a 3x3, 5x5 and 7x7 convolution).
+            The result is then concatenated along with the initial input,
+            convolved through a 1x1 convolution and passed through an activation function.
+            '''
+            y = Conv2D(filters=n_filters,kernel_size=(1,1),padding='same', dilation_rate=1)(inputs)
+            # perform conv with different kernel sizes
+            conv3 = Conv2D(filters=n_filters,kernel_size=(3,3),padding='same', dilation_rate=1)(inputs)
+            conv5 = Conv2D(filters=n_filters,kernel_size=(3,3),padding='same', dilation_rate=2)(inputs)
+            conv7 = Conv2D(filters=n_filters,kernel_size=(3,3),padding='same', dilation_rate=3)(inputs)
+            # concatenate
+            x = tf.concat([conv3, conv5, conv7, y], axis=-1)
+            # conbine the information af all filters together
+            x = Conv2D(filters=n_filters,kernel_size=(1,1),padding='same')(x)
+            # normalization
+            x = tfa.layers.GroupNormalization(groups=int(n_filters/4))(x)
+            # through the activation
+            return tf.keras.layers.LeakyReLU()(x)
+
+        # build encoder
+        x = Encoder_conv_block(x, n_filters=16)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+        x = Encoder_conv_block(x, n_filters=32)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+        x = Encoder_conv_block(x, n_filters=64)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+
+        # bottle-neck
+        x = Conv2D(filters=128, kernel_size=self.kernel_size, padding='same')(x)
+        x = Conv2D(filters=128, kernel_size=self.kernel_size, padding='same')(x)
+        x = tfa.layers.GroupNormalization(groups=int(128/4))(x)
+        x = tf.keras.layers.LeakyReLU()(x)
+
+        # encoding vector
+        encoding_vector = GlobalMaxPooling2D()(x)
+
+        # FCN
+        pred = Dropout(rate=0.4)(encoding_vector)
+        pred = Dense(units=60, activation='relu')(pred)
+        pred = Dense(units=self.num_classes)(pred)
+
+        self.model = Model(inputs=inputs, outputs=pred, name=model_name)
+
+        # save model paramenters
+        self.num_filter_start = 16
+        self.depth = 3
+        self.num_filter_per_layer = [16, 32, 64]
+        self.custom_model = False
 
         # print model if needed
         if self.debug is True:
