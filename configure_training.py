@@ -90,12 +90,12 @@ debug = args.debug == 'True'
 
 # # parse variables
 # working_folder = '/flush/iulta54/Research/P3-THR_DL/'
-# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
+# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/NEW_TFR/2D_isotropic_TFR'
 # train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
 # model_configuration = 'LightOCT'
-# model_save_name = 'LightOCT_rollback'
-# classification_type = 'c1'
-# custom_classification = False
+# model_save_name = 'LightOCT_c4_TEST'
+# classification_type = 'c4'
+# custom_classification = True
 # loss = 'cce'
 # learning_rate = 0.0001
 # batch_size = 100
@@ -118,7 +118,7 @@ if os.path.isdir(working_folder):
         save_path = os.path.join(working_folder, 'trained_models')
         os.mkdir(save_path)
 else:
-    print('The provided working folder does not exist. Input a valid one. Given {}'.format(working_folder))
+    print(f'The provided working folder does not exist. Input a valid one. Given {working_folder}')
     sys.exit()
 
 if not os.path.isdir(dataset_folder):
@@ -190,15 +190,27 @@ classification_type_dict['c3'] = {}
 classification_type_dict['c3']['unique_labels'] = [0,1,2,3,4,5]
 classification_type_dict['c3']['class_labels'] = ['normal', 'Goiter', 'Adenoma', 'Hashimoto', 'Graves', 'Cancer']
 
+# normal vs shrunk-depleted
 classification_type_dict['c4'] = {}
-classification_type_dict['c4']['unique_labels'] = [0,[1,2],3,[4,5]]
-classification_type_dict['c4']['class_labels'] = ['normal', 'Goiter', 'Adenoma', 'Hashimoto', 'Graves', 'Cancer']
+classification_type_dict['c4']['unique_labels'] = [0,[2, 3, 4, 5]]
+classification_type_dict['c4']['class_labels'] = ['normal', 'shrunk-depleted']
+
+# normal vs enlarged
+classification_type_dict['c5'] = {}
+classification_type_dict['c5']['unique_labels'] = [0,1]
+classification_type_dict['c5']['class_labels'] = ['normal', 'enlarged']
+
+# enlarged vs shrunk-depleted
+classification_type_dict['c6'] = {}
+classification_type_dict['c6']['unique_labels'] = [0,1]
+classification_type_dict['c6']['class_labels'] = ['enlarged', 'shrunk-depleted']
 
 # check if we are using a default classification type. If yes, use the train_test_split.json file
 
 if custom_classification:
     print(f'\nClassification type is not a default one. Splitting the data accordingly.')
     print(f'{"Unique labels":<26s}: {classification_type_dict[classification_type]["unique_labels"]} ')
+    print(f'{"Label description":<26s}: {classification_type_dict[classification_type]["class_labels"]} ')
     # infere file extention from the dataset files
     _, extension = os.path.splitext(glob.glob(os.path.join(dataset_folder, '*'))[10])
     file_names = glob.glob(os.path.join(dataset_folder, '*'+extension))
@@ -273,7 +285,7 @@ if custom_classification:
         per_class_unique_volumes.append(list(dict.fromkeys(aus)))
 
     # 2
-    random.seed(29)
+    random.seed(29122009)
     per_class_random_files = []
     index_of_selected_files = []
 
@@ -302,10 +314,6 @@ if custom_classification:
     # 4 get the remaining training validation files
     train_val_filenames = [f for i, f in enumerate(file_names) if i not in index_of_selected_files]
 
-# make sure that no training file is in the test set
-for f in train_val_filenames:
-    if f in test_filenames:
-        raise ValueError('Train testing split did not go as planned. Check implementation')
 
 ## compute class weights on the training dataset and apply imbalance data strategy
 
@@ -348,18 +356,31 @@ if imbalance_data_strategy == 'oversampling':
         print(f'Using class weights instead. Setting loss function to weighted categorical cross entropy (wcce)')
         imbalance_data_strategy = 'weights'
         class_weights = class_weights.sum() / class_weights**1
-        class_weights = class_weights / class_weights.sum()
+        # class_weights = class_weights / class_weights.sum()
         loss = 'wcce'
 
 elif imbalance_data_strategy == 'weights':
     print(f'\nUsing {imbalance_data_strategy} strategy to handle imbalance data.')
     print(f'Setting loss function to wcce given the oversampling strategy')
     class_weights = class_weights.sum() / class_weights**1
-    class_weights = class_weights / class_weights.sum()
+    # class_weights = class_weights / class_weights.sum()
     loss = 'wcce'
 
 n_train = len(train_val_filenames)
 n_test = len(test_filenames)
+
+# ############## check that no testing files are in the training validation pool
+#
+print('Checking if any test samples are in the training - validation pool (this may take time...)')
+duplicated = []
+for idx, ts in enumerate(test_filenames):
+    print(f'Checked {idx+1}/{len(test_filenames)} \r', end='')
+    for tr in train_val_filenames:
+        if os.path.basename(ts) == os.path.basename(tr):
+            duplicated.append(ts)
+            raise ValueError(f'Some of the testing files are in the trianing - validation pool ({len(duplicated)} out of {len(test_filenames)}). CHECK IMPLEMENTATION!!!')
+
+print('No testing files found in the training - validation pool. All good!!!')
 
 print(f'\nWill train and validate on {n_train} images (some might have been removed since not classifiebly in this task)')
 print(f'Will test on {n_test} images ({n_images_per_class} for each class)')
