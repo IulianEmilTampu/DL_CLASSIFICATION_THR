@@ -17,6 +17,81 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras import layers
+
+from keras.engine import base_layer, base_preprocessing_layer
+from keras import backend
+from keras.utils import control_flow_util
+
+## RandomBrightness layer
+
+class RandomBrightness(base_layer.Layer):
+  """A preprocessing layer which randomly adjusts brightnes during training.
+  This layer will randomly adjust the brightness of an image or images by a random
+  factor. Contrast is adjusted independently for each channel of each image
+  during training.
+  For an overview and full list of preprocessing layers, see the preprocessing
+  [guide](https://www.tensorflow.org/guide/keras/preprocessing_layers).
+  Input shape:
+    3D (unbatched) or 4D (batched) tensor with shape:
+    `(..., height, width, channels)`, in `"channels_last"` format.
+  Output shape:
+    3D (unbatched) or 4D (batched) tensor with shape:
+    `(..., height, width, channels)`, in `"channels_last"` format.
+  Attributes:
+    max_delta: float, must be non-negative.
+    seed: Integer. Used to create a random seed.
+  """
+
+  def __init__(self, max_delta, seed=None, **kwargs):
+    base_preprocessing_layer.keras_kpl_gauge.get_cell('RandomBrightness').set(
+        True)
+    super(RandomBrightness, self).__init__(**kwargs)
+    self.max_delta = max_delta
+    if self.max_delta < 0:
+      raise ValueError('max_delta cannot have negative values or greater than 1.0,'
+                       ' got {}'.format(factor))
+    self.seed = seed
+
+  def call(self, inputs, training=True):
+    if training is None:
+      training = backend.learning_phase()
+
+    def random_brighted_inputs():
+      if self.seed is not None:
+        return tf.image.random_brightness(
+            inputs, max_delta=self.max_delta, seed=self.seed)
+      else:
+        return tf.image.random_brightness(
+            inputs, max_delta=self.max_delta, seed=None)
+            # seed=tf.random.uniform(shape=(1,1), minval=0, maxval=10^5, dtype=tf.dtypes.int32))
+
+    output = control_flow_util.smart_cond(training, random_brighted_inputs,
+                                          tf.autograph.experimental.do_not_convert(lambda: inputs))
+    output.set_shape(inputs.shape)
+    return output
+
+  def compute_output_shape(self, input_shape):
+    return input_shape
+
+  def get_config(self):
+    config = {
+        'max_delta': self.max_delta,
+        'seed': self.seed,
+    }
+    base_config = super(RandomBrightness, self).get_config()
+    return dict(list(base_config.items()) + list(config.items()))
+
+## augmentation pipeline
+
+def augmentor(inputs):
+    aug = tf.keras.Sequential([
+            layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+            layers.experimental.preprocessing.RandomRotation(0.02),
+            layers.experimental.preprocessing.RandomContrast(factor=0.8),
+            RandomBrightness(0.5)],
+            name='Augmentation')
+    return aug(inputs)
 
 ## labels
 
@@ -57,9 +132,11 @@ def fix_labels_v2(labels, classification_type, unique_labels, categorical=True):
     if not isinstance(classification_type, str):
         raise TypeError(f'classification_type expected to be a list, but give {type(classification_type)}')
     else:
-        # chack that it specifies a know classification type
+        # check that it specifies a know classification type
         if not (classification_type=='c1' or classification_type=='c2' or classification_type=='c3'):
-            raise ValueError(f'classification_type expected to be c1, c2 or c3. Instead was given {classification_type}')
+            # raise Warning(f'classification_type expected to be c1, c2 or c3. Instead was given {classification_type}\n')
+            # print('Setting classification type to c3 to be able to fix the labels. * Check that this is correct!')
+            classification_type = 'c3'
 
     # get the right label list based on the classification type
     if classification_type=='c1':
@@ -183,8 +260,8 @@ def plotModelPerformance_v2(tr_loss, tr_acc, val_loss, val_acc, tr_f1, val_f1, s
     line_style = [':', '-.', '--', '-']
     ax1.set_xlabel('Epochs', fontsize=15)
     ax1.set_ylabel('Loss', fontsize=15)
-    l1 = ax1.plot(tr_loss, colors[0], ls=line_style[0])
-    l2 = ax1.plot(val_loss, colors[1], ls=line_style[1])
+    l1 = ax1.plot(tr_loss, colors[0], ls=line_style[2])
+    l2 = ax1.plot(val_loss, colors[1], ls=line_style[3])
     plt.legend(['Training loss', 'Validation loss'])
 
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
@@ -260,19 +337,30 @@ def plotVAEreconstruction(original, reconstructed, epoch, save_path, display=Fal
     ax[1][0].set_xticks([])
     ax[1][0].set_yticks([])
 
-    ax[1][1].imshow(reconstructed[1,:,:,0], cmap='gray', interpolation=None)
-    ax[1][1].set_title('Mean {:.03f}, min {:.03f}, max {:.03f}'
-            .format(reconstructed[1,:,:,0].mean(),
-                    reconstructed[1,:,:,0].min(),
-                    reconstructed[1,:,:,0].max()))
-    ax[1][1].set_xticks([])
-    ax[1][1].set_yticks([])
+    # # ################## Original hist plotting
+    # ax[2][0].hist(original[0,:,:,0].ravel(), bins=256)
+    # ax[2][0].hist(reconstructed[0,:,:,0].numpy().ravel(), bins=256)
+    #
+    # ax[2][1].hist(original[1,:,:,0].ravel(), bins=256)
+    # ax[2][1].hist(reconstructed[1,:,:,0].numpy().ravel(), bins=256)
+    #
+    # fig.savefig(os.path.join(save_path, 'reconstruction_'+str(epoch+1)+'.pdf'),
+    #                 bbox_inches='tight', dpi = 100)
+    # fig.savefig(os.path.join(save_path, 'reconstruction_'+str(epoch+1)+'.png'),
+    #                 bbox_inches='tight', dpi = 100)
+    # # ################## Original hist plotting
 
-    ax[2][0].hist(original[0,:,:,0].flatten(), bins=256)
-    ax[2][0].hist(reconstructed[0,:,:,0].flatten(), bins=256)
+    o = original[0,:,:,0].ravel()
+    r = reconstructed[0,:,:,0].ravel()
+    bins=np.histogram(np.hstack((o,r)), bins=100)[1] #get the bin edges
+    ax[2][0].hist(o, bins=bins, alpha=0.5, label='original')
+    ax[2][0].hist(r, bins=bins, alpha=0.5, label='reconstructed')
 
-    ax[2][1].hist(original[1,:,:,0].flatten(), bins=256)
-    ax[2][1].hist(reconstructed[1,:,:,0].flatten(), bins=256)
+    o = original[1,:,:,0].ravel()
+    r = reconstructed[1,:,:,0].ravel()
+    bins=np.histogram(np.hstack((o,r)), bins=40)[1] #get the bin edges
+    ax[2][1].hist(o, bins=bins, alpha=0.5, label='original')
+    ax[2][1].hist(r, bins=bins, alpha=0.5, label='reconstructed')
 
     fig.savefig(os.path.join(save_path, 'reconstruction_'+str(epoch+1)+'.pdf'),
                     bbox_inches='tight', dpi = 100)
@@ -575,6 +663,277 @@ def train(self, training_dataloader,
                     print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                 break
 
+
+## training routine for not VAE models using lookahead optimizer
+
+def train_lookaheadOPT(self, training_dataloader,
+                validation_dataloader,
+                unique_labels,
+                classification_type,
+                loss=('cee'),
+                start_learning_rate = 0.001,
+                scheduler='polynomial',
+                power=0.1,
+                max_epochs=200,
+                early_stopping=True,
+                patience=20,
+                save_model_path=os.getcwd(),
+                save_model_architecture_figure=True,
+                verbose=1):
+
+    # define parameters useful to store training and validation information
+    self.initial_learning_rate = start_learning_rate
+    self.scheduler = scheduler
+    self.maxEpochs = max_epochs
+    self.learning_rate_history = []
+    self.loss = loss
+    self.num_validation_samples = 0
+    self.num_training_samples = 0
+    self.unique_labels=unique_labels
+    self.classification_type=classification_type
+    self.save_model_path=save_model_path
+
+    if verbose <= 2 and isinstance(verbose, int):
+        self.verbose=verbose
+    else:
+        print('Invalid verbose parameter. Given {} but expected 0, 1 or 2. Setting to default 1'.format(verbose))
+
+    # save model architecture figure
+    if save_model_architecture_figure is True:
+        try:
+            tf.keras.utils.plot_model(self.model, to_file=os.path.join(self.save_model_path, 'model_architecture.png'), show_shapes=True)
+        except:
+            print('Cannot save model architecture as figure. Printing instead.')
+            self.model.summary()
+
+    if early_stopping:
+        self.best_acc = 0.0
+        self.best_f1 = 0.0
+        n_wait = 0
+
+    classification_loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    mse = tf.keras.losses.MeanSquaredError()
+
+    def classificationLoss(model, x, y, training):
+        # training=training is needed only if there are layers with different
+        # behavior during training versus inference (e.g. Dropout).
+        y_= model(x, training=training)
+        return classification_loss_object(y_true=y, y_pred=y_)
+
+    def grad(model, inputs, targets):
+        with tf.GradientTape() as tape:
+            loss_value = classificationLoss(model, inputs, targets, training=True)
+        return loss_value, tape.gradient(loss_value, model.trainable_variables)
+
+    # Keep results for plotting
+    self.train_loss_history = []
+    self.train_accuracy_history = []
+    self.val_loss_history = []
+    self.val_accuracy_history = []
+    self.train_f1_history = []
+    self.val_f1_history = []
+    start = time.time()
+
+    # initialize the variables
+    tr_epoch_loss_avg = tf.keras.metrics.Mean()
+    tr_epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
+    tr_epoch_f1 = tfa.metrics.F1Score(num_classes=self.num_classes, average='macro')
+    val_epoch_loss_avg = tf.keras.metrics.Mean()
+    val_epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
+    val_epoch_f1 = tfa.metrics.F1Score(num_classes=self.num_classes, average='macro')
+
+
+    # start looping through the epochs
+    for epoch in range(self.maxEpochs):
+        # reset metrics (keep only values for one epoch at the time)
+        tr_epoch_loss_avg.reset_states()
+        tr_epoch_accuracy.reset_states()
+        tr_epoch_f1.reset_states()
+        val_epoch_loss_avg.reset_states()
+        val_epoch_accuracy.reset_states()
+        val_epoch_f1.reset_states()
+
+        # compute learning rate based on the scheduler
+        if self.scheduler == 'linear':
+            self.power = 1
+        elif self.scheduler == 'polynomial':
+            self.power = power
+        else:
+            raise TypeError('Invalid scheduler. given {} but expected linear or polynomial'.format(self.scheduler))
+
+        lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
+        self.learning_rate_history.append(lr)
+
+        # set optimizer - using the Range optimizer
+        optimizer = tfa.optimizers.RectifiedAdam(learning_rate=lr)
+        optimizer = tfa.optimizers.Lookahead(optimizer=optimizer, sync_period=6, slow_step_size=0.5)
+
+        # ####### TRAINING
+        step = 0
+        for x, y in training_dataloader:
+            step += 1
+
+            # fix labels
+            y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels, categorical=False)
+
+            # save information about training image size
+            if epoch == 0 and step == 1:
+                self.batch_size = x.shape[0]
+                self.input_size = (x.shape[1], x.shape[2])
+
+            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+            # import utilities
+            #
+            # y_, aug = self.model(x, training=True)
+            # utilities.show_batch_2D_with_histogram((aug.numpy(), y.numpy()))
+            # sys.exit()
+            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+            train_loss, grads = grad(self.model, x, y)
+
+            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+            # print(grads[-1])
+            #
+            # optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+            # train_loss, grads = grad(self.model, x, y)
+            # print(grads[-1])
+            #
+            # sys.exit()
+            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
+
+            optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+
+            # Track loss and accuracy
+            tr_epoch_loss_avg.update_state(train_loss)
+            tr_epoch_accuracy.update_state(y, self.model(x, training=True))
+            tr_epoch_f1.update_state(to_categorical(y, num_classes=self.num_classes), self.model(x, training=True))
+
+            # print values
+            if self.verbose == 2:
+                if epoch == 0:
+                    print('\r', end='')
+                    print('Epoch {:04d} training -> {:04d}/unknown -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f}\r'
+                            .format(epoch+1,
+                                step,
+                                tr_epoch_loss_avg.result(),
+                                tr_epoch_accuracy.result(),
+                                tr_epoch_f1.result()),
+                            end='')
+                else:
+                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
+                            .format(epoch+1,
+                                    step,
+                                    self.num_training_samples//self.batch_size,
+                                    tr_epoch_loss_avg.result(),
+                                    tr_epoch_accuracy.result(),
+                                    tr_epoch_f1.result()),
+                            end='')
+
+        # finisced all the training batches -> save training loss
+        self.train_loss_history.append(tr_epoch_loss_avg.result().numpy().astype(float))
+        self.train_accuracy_history.append(tr_epoch_accuracy.result().numpy().astype(float))
+        self.train_f1_history.append(tr_epoch_f1.result().numpy().astype(float))
+
+        if epoch == 0:
+            self.num_training_samples = self.batch_size*step
+
+        # ########### VALIDATION
+        step = 0
+        for x, y in validation_dataloader:
+            step += 1
+
+            # fix labels
+            y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels, categorical=False)
+
+            val_loss = classificationLoss(self.model, x, y, training=False)
+
+            # track progress
+            val_epoch_loss_avg.update_state(val_loss)
+            val_epoch_accuracy.update_state(y, self.model(x, training=False))
+            val_epoch_f1.update_state(to_categorical(y, num_classes=self.num_classes), self.model(x, training=False))
+
+            # print values
+            if self.verbose == 2:
+                if epoch == 0:
+                    print('\r', end='')
+                    print('Epoch {:04d} validation -> {:04d}/unknown -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f}\r'
+                            .format(epoch+1,
+                                    step,
+                                    val_epoch_loss_avg.result(),
+                                    val_epoch_accuracy.result(),
+                                    val_epoch_f1.result()),
+                                end='')
+                else:
+                    print('Epoch {:04d} validation -> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f}\r'
+                            .format(epoch+1,
+                                step,
+                                self.num_validation_samples//self.batch_size,
+                                val_epoch_loss_avg.result(),
+                                val_epoch_accuracy.result(),
+                                val_epoch_f1.result()),
+                            end='')
+
+
+        # finisced all the batches in the validation
+        self.val_loss_history.append(val_epoch_loss_avg.result().numpy().astype(float))
+        self.val_accuracy_history.append(val_epoch_accuracy.result().numpy().astype(float))
+        self.val_f1_history.append(val_epoch_f1.result().numpy().astype(float))
+
+
+        if self.verbose == 1 or self.verbose == 2:
+            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f}'.format(epoch+1,
+                            self.train_loss_history[-1], self.train_accuracy_history[-1], self.train_f1_history[-1],
+                            self.val_loss_history[-1], self.val_accuracy_history[-1],  self.val_f1_history[-1]))
+        if epoch == 0:
+            self.num_validation_samples = self.batch_size*step
+
+        if epoch % 2 == 0:
+            # plotModelPerformance(self.train_loss_history,
+            #                         self.train_accuracy_history,
+            #                         self.val_loss_history,
+            #                         self.val_accuracy_history,
+            #                         self.save_model_path,
+            #                         display=False)
+
+            plotModelPerformance_v2(self.train_loss_history,
+                                    self.train_accuracy_history,
+                                    self.val_loss_history,
+                                    self.val_accuracy_history,
+                                    self.train_f1_history,
+                                    self.val_f1_history,
+                                    self.save_model_path,
+                                    display=False)
+
+            plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
+
+        if early_stopping:
+            # check if model accurary improved, and update counter if needed
+            if self.val_f1_history[-1] > self.best_f1:
+                # save model checkpoint
+                if self.verbose == 1 or self.verbose == 2:
+                    print(' - Saving model checkpoint in {}'.format(self.save_model_path))
+                # save some extra parameters
+
+                stop = time.time()
+                self.training_time, _ = tictoc(start, stop)
+                self.training_epochs = epoch
+                self.best_acc = self.val_accuracy_history[-1]
+                self.best_f1 = self.val_f1_history[-1]
+
+                # save model
+                save_model(self)
+
+                # reset counter
+                n_wait = 0
+            else:
+                n_wait += 1
+            # check max waiting is reached
+            if n_wait == patience:
+                if self.verbose == 1 or self.verbose == 2:
+                    print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
+                break
+
+
 ## TRAINING ROUTINE FOR VAE MODEL
 def train_VAE(self, training_dataloader,
                 validation_dataloader,
@@ -853,376 +1212,7 @@ def train_VAE(self, training_dataloader,
                     print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                 break
 
-
-# def train(self, training_dataloader,
-#                 validation_dataloader,
-#                 classification_type,
-#                 unique_labels,
-#                 loss=('cee'),
-#                 start_learning_rate = 0.001,
-#                 scheduler='polynomial',
-#                 power=0.1,
-#                 max_epochs=200,
-#                 early_stopping=True,
-#                 patience=20,
-#                 save_model_path=os.getcwd(),
-#                 save_model_architecture_figure=True,
-#                 vae_kl_weight=0.1,
-#                 vae_reconst_weight=0.1,
-#                 verbose=1):
-#     '''
-#
-#     Training function used to train models implemented in the models_tf.py file
-#     in the context of the project for deep learning-based OCT image classsification.
-#
-#     Parameters
-#     ----------
-#     self : models_tf.model
-#         Model to train (see available in models_tf.py)
-#     training_dataloader : tensorflow.python.data.ops.dataset_ops.PrefetchDataset
-#             Tensorflow dataloader that outputs a tuple of (image, label)
-#     validation_dataloader : tensorflow.python.data.ops.dataset_ops.PrefetchDataset
-#             Tensorflow dataloader that outputs a tuple of (image, label)
-#     classification_type : str
-#         Specifies the type of classification. it can be c1, c2 or c3. Needed to fix the
-#         labels using the unique_labels
-#     unique_labels : list
-#         List that specifies the classes to be included in every class. This is
-#         needed by the fix_label function to adjust the image labels based on the
-#         classification type.
-#     loss : str
-#         Type of loss function to use when comparing the model prediction with
-#         the ground truth. Available 'cce' - categorical cross entropy and
-#         'wcce' - weighted categorical cross entropy.
-#     start_learning_rate : float
-#         Starting learning rate (default=0.001).
-#     scheduler : str
-#         Specifies the type of learning rate scheduler to use during training.
-#         Available linear and polynomial (defauls linear).
-#     power : (float)
-#         Power of the polynomial learning rate scheduler (default=0.1).
-#     max_epochs : int
-#         Maximum number of epochs to run during training (default=200).
-#     early_stopping : bool
-#         Specifies if early stopping is used (True - default) or not (False).
-#     patience : int
-#         If early_stopping is True, specifies the number of epochs to waint the
-#         validation to increase before stopping the training (default=20).
-#     save_model_path : str
-#         Path to where the model and the training progress are saved (default=current
-#         working directory).
-#     vae_kl_weight : float
-#         Used when a Variational Auto Encoder model is used. This specifies the
-#         weight of the KL loss in the total model loss (defaul=0.1).
-#     vae_reconst_weight : float
-#         Used when a Variational Auto Encoder model is used. This specifies the
-#         weight of the reconstruction loss in the total model loss (default=0.1).
-#     verbose : int
-#         Specifies how much is printed during the training (0=nothing, 1=every
-#         epoch - default, 2=every batch)
-#
-#     The training loop goes as follows for one epoch
-#     1 - for all the batches of data in the dataloader
-#     2 - fix labels based on the unique labels specification
-#     3 - compute training logits
-#     4 - compute loss and accuracy
-#     5 - update weights using the optimizer
-#
-#     When the training batches are finished run validation
-#
-#     6 - compute validation logits
-#     7 - compute validation loss and accuracy
-#     8 - check for early stopping
-#     9 - save perfromance curves and loss decay curve (if VEA model, save also
-#         reconstructed image)
-#     10 - save model if early stopping or the max number of epochs is reached
-#         in the specified directory
-#     '''
-#
-#     # define parameters useful to store training and validation information
-#     self.save_model_path = save_model_path
-#     self.train_loss_history, self.val_loss_history = [], []
-#     self.train_acc_history, self.val_acc_history = [], []
-#     self.train_f1_history, self.val_f1_history = [], []
-#     self.initial_learning_rate = start_learning_rate
-#     self.scheduler = scheduler
-#     self.maxEpochs = max_epochs
-#     self.learning_rate_history = []
-#     self.loss = loss
-#     self.num_validation_samples = 0
-#     self.num_training_samples = 0
-#     self.vae_kl_weight=vae_kl_weight
-#     self.vae_reconst_weight=vae_reconst_weight
-#     self.unique_labels = unique_labels
-#     self.classification_type = classification_type
-#
-#
-#     if verbose <= 2 and isinstance(verbose, int):
-#         self.verbose=verbose
-#     else:
-#         print('Invalid verbose parameter. Given {} but expected 0, 1 or 2. Setting to default 1'.format(verbose))
-#
-#     # save model architecture figure
-#     if save_model_architecture_figure is True:
-#         try:
-#             tf.keras.utils.plot_model(self.model, to_file=os.path.join(self.save_model_path, 'model_architecture.png'), show_shapes=True)
-#         except:
-#             print('Cannot save model architecture as figure. Printing instead.')
-#             self.model.summary()
-#
-#     if early_stopping:
-#         self.best_acc = 0.0
-#         self.best_f1 = 0.0
-#         n_wait = 0
-#
-#
-#     start = time.time()
-#     # start looping through the epochs
-#     for epoch in range(self.maxEpochs):
-#         # initialize the variables
-#         epoch_train_loss, epoch_val_loss = [], []
-#         epoch_train_acc, epoch_val_acc = [], []
-#         epoch_train_f1, epoch_val_f1 = [], []
-#
-#         # compute learning rate based on the scheduler
-#         if self.scheduler == 'linear':
-#             self.power = 1
-#         elif self.scheduler == 'polynomial':
-#             self.power = power
-#         else:
-#             raise TypeError('Invalid scheduler. given {} but expected linear or polynomial'.format(self.scheduler))
-#
-#         lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
-#         self.learning_rate_history.append(lr)
-#
-#         # set optimizer - using ADAM by default
-#         optimizer = Adam(lr=lr)
-#
-#         # ####### TRAINING
-#         step = 0
-#         for x, y in training_dataloader:
-#             step += 1
-#
-#             # fix labels
-#             y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels, categorical=True)
-#
-#             # save information about training image size
-#             if epoch == 0 and step == 1:
-#                 self.batch_size = x.shape[0]
-#                 self.input_size = (x.shape[1], x.shape[2])
-#
-#             # Open a GradientTape to record the operations run
-#             # during the forward pass, which enables autodifferentiation.
-#             with tf.GradientTape() as tape:
-#                 # Logits for this minibatch
-#                 if 'VAE' in self.model_name:
-#                     train_logits, reconstruction, augmented_norm, z_mean, z_log_var, z = self.model(x, training=True)
-#                 else:
-#                     train_logits = self.model(x, training=True)
-#
-#                 # classification loss
-#                 for l in loss:
-#                     if l == 'cce':
-#                         # compute categorical cross entropy
-#                         cce = tf.keras.losses.CategoricalCrossentropy()
-#                         classification_loss = cce(y, train_logits)
-#                         # compute weighted categorical cross entropy
-#                     elif l == 'wcce':
-#                         weights = tf.constant(self.class_weights, dtype=tf.float32)
-#                         # one weight for each sample [batch_size, 1]
-#                         weights = tf.reduce_sum(weights * y, axis=1)
-#                         # weighted loss
-#                         cce = tf.keras.losses.CategoricalCrossentropy()
-#                         classification_loss = cce(y, train_logits, sample_weight=weights)
-#                     else:
-#                         raise TypeError(f'Invalid loss. Given {l} but expected cee or wcce.')
-#
-#                     if 'VAE' in self.model_name:
-#                         # reconstruction loss
-#                         mse = tf.keras.losses.MeanSquaredError()
-#                         reconstruction_loss = mse(augmented_norm, reconstruction)*1000
-#
-#                         #k-1 loss: Kulback-Leibler divergence that tries to make the latent space (z)
-#                         # of the encoded vector as regular as possible (N(0,1))
-#                         kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
-#                         kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-#
-#                         # COMPUTE TOTAL LOSS
-#                         # it is very important for the loss to be a tensor! If not
-#                         # the gradient tape will not be able to use it during the
-#                         # backpropagation.
-#
-#                         train_loss = classification_loss + self.vae_kl_weight*kl_loss + self.vae_reconst_weight*reconstruction_loss
-#                 else:
-#                     # COMPUTE TOTAL LOSS
-#                     # it is very important for the loss to be a tensor! If not
-#                     # the gradient tape will not be able to use it during the
-#                     # backpropagation.
-#                     train_loss = classification_loss
-#
-#
-#             # Use the gradient tape to automatically retrieve
-#             # the gradients of the trainable variables with respect to the loss.
-#             if 'VAE' in self.model_name:
-#                 # grads = tape.gradient(train_loss, self.model.trainable_weights,
-#                 #                       unconnected_gradients=tf.UnconnectedGradients.ZERO)
-#                 grads = tape.gradient(train_loss, self.model.trainable_variables,
-#                                       unconnected_gradients=tf.UnconnectedGradients.ZERO)
-#             else:
-#                 # grads = tape.gradient(train_loss, self.model.trainable_weights)
-#                 grads = tape.gradient(train_loss, self.model.trainable_variables)
-#
-#             # save metrics
-#             epoch_train_loss.append(float(train_loss))
-#             train_acc = accuracy(y, train_logits)
-#             train_f1 = f1Score(y, train_logits)
-#             epoch_train_acc.append(float(train_acc))
-#             epoch_train_f1.append(float(train_f1))
-#
-#             # Run one step of gradient descent by updating
-#             # the value of the variables to minimize the loss.
-#             optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
-#
-#             # print values
-#             if self.verbose == 2:
-#                 if epoch == 0:
-#                     print('\r', end='')
-#                     print(f'Epoch {epoch+1:04d} training (counting training steps) -> {step:04d} -> tr_loss:{train_loss:.4f}, tr_acc:{train_acc:.4f}, tr_f1:{train_f1:.4f} \r',end='')
-#                 else:
-#                     print(f'Epoch {epoch+1:04d} training -> {step:04d}/{self.num_training_samples//self.batch_size:04d} -> tr_loss:{train_loss:.4f}, tr_acc:{train_acc:.4f}, tr_f1:{train_f1:.4f} \r',end='')
-#
-#         # finisced all the training batches -> save training loss
-#         self.train_loss_history.append(np.mean(np.array(epoch_train_loss), axis=0))
-#         self.train_acc_history.append(np.mean(np.array(epoch_train_acc), axis=0))
-#         self.train_f1_history.append(np.mean(np.array(epoch_train_f1), axis=0))
-#         if epoch == 0:
-#             self.num_training_samples = self.batch_size*step
-#
-#         # ########### VALIDATION
-#         step = 0
-#         for x, y in validation_dataloader:
-#             step += 1
-#
-#             # fix labels
-#             y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels)
-#
-#             # logits for this validation batch
-#             if 'VAE' in self.model_name:
-#                 val_logits, reconstruction, augmented_norm, z_mean, z_log_var, z = self.model(x, training=False)
-#                 # print(f'Z_mean: {z_mean}')
-#                 # print(f'Z_var: {z_log_var}')
-#             else:
-#                 val_logits = self.model(x, training=False)
-#
-#             # classification loss
-#             for l in loss:
-#                 if l == 'cce':
-#                     # compute categorical cross entropy
-#                     cce = tf.keras.losses.CategoricalCrossentropy()
-#                     classification_loss = cce(y, val_logits)
-#                     # compute weighted categorical cross entropy
-#                 elif l == 'wcce':
-#                     weights = tf.constant(self.class_weights, dtype=tf.float32)
-#                     # one weight for each sample [batch_size, 1]
-#                     weights = tf.reduce_sum(weights * y, axis=1)
-#                     # weighted loss
-#                     cce = tf.keras.losses.CategoricalCrossentropy()
-#                     classification_loss = cce(y, val_logits, sample_weight=weights)
-#                 else:
-#                     raise TypeError(f'Invalid loss. given {l} but expected cee or wcce')
-#
-#             if 'VAE' in self.model_name:
-#                 # reconstruction loss
-#                 mse = tf.keras.losses.MeanSquaredError()
-#                 reconstruction_loss = mse(augmented_norm, reconstruction)*1000
-#                 print(f'Reconstruction loss: {reconstruction_loss:0.4f}')
-#
-#                 #k-1 loss: Kulback-Leibler divergence that tries to make the latent space (z)
-#                 # of the encoded vector as regular as possible (N(0,1))
-#                 kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
-#                 # print(f'z_mean min and max: {tf.math.reduce_min(z_mean):0.4f} and {tf.math.reduce_max(z_mean):0.4f}')
-#                 # print(f'z_log_var min and max: {tf.math.reduce_min(z_log_var):0.4f} and {tf.math.reduce_max(z_log_var):0.4f}')
-#                 # print(f'KL loss min and max: {tf.math.reduce_min(kl_loss):0.4f} and {tf.math.reduce_max(kl_loss):0.4f}')
-#                 kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-#                 # print(f'KL loss: {kl_loss:0.4f}')
-#                 # sys.exit()
-#
-#                 # COMPUTE TOTAL LOSS
-#                 # it is very important for the loss to be a tensor! If not
-#                 # the gradient tape will not be able to use it during the
-#                 # backpropagation.
-#                 val_loss = classification_loss + self.vae_kl_weight*kl_loss + self.vae_reconst_weight*reconstruction_loss
-#             else:
-#                 val_loss = classification_loss
-#
-#             epoch_val_loss.append(float(val_loss))
-#             val_acc = accuracy(y, val_logits)
-#             val_f1 = f1Score(y, val_logits)
-#             epoch_val_acc.append(float(val_acc))
-#             epoch_val_f1.append(float(val_f1))
-#
-#             # print values
-#             if self.verbose == 2:
-#                 if epoch == 0:
-#                     print('\r', end='')
-#                     print(f'Epoch {epoch+1:04d} validation (counting validation steps) -> {step:04d} -> val_loss:{val_loss:.4f}, val_acc:{val_acc:.4f}, val_f1:{val_f1:.4f} \r', end='')
-#                 else:
-#                     print(f'Epoch {epoch+1:04d} validation -> {step:04d}/{self.num_validation_samples//self.batch_size:04d} -> val_loss:{val_loss:.4f}, val_acc:{val_acc:.4f}, val_f1:{val_f1:.4f} \r', end='')
-#
-#
-#         # finisced all the batches in the validation
-#         self.val_loss_history.append(np.mean(np.array(epoch_val_loss), axis=0))
-#         self.val_acc_history.append(np.mean(np.array(epoch_val_acc), axis=0))
-#         self.val_f1_history.append(np.mean(np.array(epoch_val_f1), axis=0))
-#
-#         if self.verbose == 1 or self.verbose == 2:
-#             print(f'Epoch {epoch+1:04d} -> tr_loss:{self.train_loss_history[-1]:.4f}, tr_acc:{self.train_acc_history[-1]:.4f}, val_loss:{self.val_loss_history[-1]:.4f}, val_acc:{self.val_acc_history[-1]:.4f}, val_f1:{self.val_f1_history[-1]:.04} {" "*10:<10s}')
-#         if epoch == 0:
-#             self.num_validation_samples = self.batch_size*step
-#
-#         if epoch % 2 == 0:
-#             plotModelPerformance_v2(self.train_loss_history,
-#                                     self.train_acc_history,
-#                                     self.val_loss_history,
-#                                     self.val_acc_history,
-#                                     self.train_f1_history,
-#                                     self.val_f1_history,
-#                                     self.save_model_path,
-#                                     display=False)
-#
-#             plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
-#
-#             if 'VAE' in self.model_name:
-#                 plotVAEreconstruction(augmented_norm.numpy(), reconstruction, epoch, self.save_model_path)
-#
-#         if early_stopping:
-#             # check if model accurary improved, and update counter if needed
-#             if self.val_f1_history[-1] > self.best_f1:
-#                 # save model checkpoint
-#                 if self.verbose == 1 or self.verbose == 2:
-#                     print(f' - Saving model checkpoint in {self.save_model_path}')
-#                 # save some extra parameters
-#
-#                 stop = time.time()
-#                 self.training_time, _ = tictoc(start, stop)
-#                 # self.training_time = 1234
-#                 self.training_epochs = epoch
-#                 self.best_acc = self.val_acc_history[-1]
-#                 self.best_f1 = self.val_f1_history[-1]
-#
-#                 # save model
-#                 save_model(self)
-#
-#                 # reset counter
-#                 n_wait = 0
-#             else:
-#                 n_wait += 1
-#             # check max waiting is reached
-#             if n_wait == patience:
-#                 if self.verbose == 1 or self.verbose == 2:
-#                     print(f' -  Early stopping patient reached. Last model saved in {self.save_model_path}')
-#                 break
-
+## TEST ROUTINE
 def test(self, test_dataloader):
     '''
 

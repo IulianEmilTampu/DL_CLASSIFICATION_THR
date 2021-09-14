@@ -94,7 +94,7 @@ def get_organized_files(file_names, classification_type,
                 raise ValueError(f'Not custom classification was set. classification_type expected to be c1, c2 or c3. Instead was given {classification_type}')
 
     if custom:
-        # set lassification type to c3
+        # set lassification type to c3 to be able to get the last label
         classification_type = 'c3'
         # custom label aggregation given, thus checking if custom_labels is given
         if custom_labels:
@@ -114,35 +114,29 @@ def get_organized_files(file_names, classification_type,
             raw_labels.append(label)
             filtered_file_names.append(file)
 
-    # aggregate base on the specification
-    if custom:
-        # use custom aggregation
-        organized_files = [[] for i in range(len(custom_labels))]
-        labels = np.zeros(len(filtered_file_names))
+    # use custom aggregation
+    final_file_names = []
+    organized_files = [[] for i in range(len(custom_labels))]
+    labels = []
+    for f, c in zip(filtered_file_names, raw_labels):
         for idx, l in enumerate(custom_labels):
             if type(l) is list:
                 for ll in l:
-                    indexes = [i for i, x in enumerate(raw_labels) if x==ll]
-                    organized_files[idx].extend([filtered_file_names[i] for i in indexes])
-                    labels[indexes] = idx
-            else:
-                indexes = [i for i, x in enumerate(raw_labels) if x==l]
-                organized_files[idx].extend([filtered_file_names[i] for i in indexes])
-                labels[indexes] = idx
-    else:
-        # use default aggredation
-        organized_files = [[] for i in range(np.unique(raw_labels).shape[0])]
-        labels = np.zeros((len(filtered_file_names)))
-        for idx, l in enumerate(np.unique(raw_labels)):
-            indexes = [i for i, x in enumerate(raw_labels) if x == l]
-            organized_files[idx].extend([filtered_file_names[i] for i in indexes])
-            labels[indexes] = idx
+                    if c == ll:
+                        organized_files[idx].append(f)
+                        labels.append(idx)
+                        final_file_names.append(f)
+            elif c == l:
+                organized_files[idx].append(f)
+                labels.append(idx)
+                final_file_names.append(f)
+
 
     if categorical == True:
         # convert labels to categorical
         labels = to_categorical(labels, num_classes=np.unique(labels).shape[0])
 
-    return filtered_file_names, labels, organized_files
+    return final_file_names, labels, organized_files
 
 ## TENSORFLOW DATA GENERATOR
 
@@ -207,7 +201,7 @@ def preprocess_augment(dataset):
 '''
 uset the above to create the dataset
 '''
-def TFR_2D_dataset(filepath, dataset_type, batch_size, buffer_size=100, crop_size=(250, 250)):
+def TFR_2D_dataset(filepath, dataset_type, batch_size, buffer_size=100, crop_size=(200, 200)):
     # point to the files of the dataset
     dataset = tf.data.TFRecordDataset(filepath)
     # parse sample
@@ -659,7 +653,8 @@ def show_batch_2D_with_histogram(sample_batched, title=None):
         ax[0][i].set_title(sample_batched[1][img_idx])
 
         # add histogram
-        ax[1][i].hist(img.flatten(), bins=256)
+        bins = np.histogram(img, bins=100)[1] #get the bin edges
+        ax[1][i].hist(img.flatten(), bins=bins)
         # ax[1][i].set_xlim([-1.1,1.1])
     if title:
         fig.suptitle(title, fontsize=20)
