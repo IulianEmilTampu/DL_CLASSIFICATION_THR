@@ -42,22 +42,22 @@ import utilities_models_tf
 parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification. It uses the configuration file created using the configure_training.py file. Run the configuration first!')
 
 parser.add_argument('-cf','--configuration_file' ,required=True, help='Provide the path to the configuration file generated using the configure_training.py script.')
-parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 15 epochs with 10 early stop patience).', default=False)
+parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 5 epochs).', default=False)
 args = parser.parse_args()
 
 configuration_file = args.configuration_file
-debug = args.debug == True
+debug = args.debug == 'True'
 
-# configuration_file = '/flush/iulta54/Research/P3-THR_DL/trained_models/LightOCT_rollback/config.json'
-# debug = False
+# configuration_file = '/flush/iulta54/Research/P3-THR_DL/trained_models/LightOCT_c4_TEST/config.json'
+# debug = True
 
 if not os.path.isfile(configuration_file):
     raise ValueError(f'Configuration file not found. Run the configure_training.py script first. Given {configuration_file}')
 
 if debug is True:
-    print(f'\n{"-"*83}')
-    print(f'{"Running training routine in debug mode (using less data and lower number of epochs)":^20}')
-    print(f'{"-"*83}\n')
+    print(f'\n{"-"*69}')
+    print(f'{"Running training routine in debug mode (using lower number of epochs)":^20}')
+    print(f'{"-"*69}\n')
 else:
     print(f'{"-"*24}')
     print(f'{"Running training routine":^20}')
@@ -78,6 +78,7 @@ test_fold_summary = {}
 
 ## loop through the folds
 importlib.reload(utilities_models_tf)
+importlib.reload(utilities)
 
 # ############################ TRAINING
 for cv in range(config['N_FOLDS']):
@@ -87,6 +88,10 @@ for cv in range(config['N_FOLDS']):
     # get the file names for training and validation
     X_train = config['training'][cv]
     X_val = config['validation'][cv]
+
+    for f in X_train:
+        if not os.path.isfile(f):
+            raise ValueError(f'{f} not found')
 
     # create datasets
     train_dataset = utilities.TFR_2D_dataset(X_train,
@@ -116,7 +121,6 @@ for cv in range(config['N_FOLDS']):
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size'],
-                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'M2':
         model = models_tf.M2(number_of_input_channels = 1,
@@ -126,7 +130,6 @@ for cv in range(config['N_FOLDS']):
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
-                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'M3':
         model = models_tf.M3(number_of_input_channels = 1,
@@ -135,7 +138,6 @@ for cv in range(config['N_FOLDS']):
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
-                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'M4':
         model = models_tf.M4(number_of_input_channels = 1,
@@ -151,7 +153,6 @@ for cv in range(config['N_FOLDS']):
                         num_classes = len(config['unique_labels']),
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
-                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'InceptionV3':
         model = models_tf.InceptionV3(number_of_input_channels = 1,
@@ -160,7 +161,6 @@ for cv in range(config['N_FOLDS']):
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         input_size=config['input_size'],
-                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'VAE_original':
         model = models_tf.VAE_original(number_of_input_channels = 1,
@@ -171,7 +171,6 @@ for cv in range(config['N_FOLDS']):
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size'],
                         vae_latent_dim=config['vae_latent_dim'],
-                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'VAE1':
         model = models_tf.VAE1(number_of_input_channels = 1,
@@ -181,7 +180,6 @@ for cv in range(config['N_FOLDS']):
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size'],
-                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'VAE2':
         model = models_tf.VAE2(number_of_input_channels = 1,
@@ -191,7 +189,6 @@ for cv in range(config['N_FOLDS']):
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size'],
-                        norm_layer=normalizer
                         )
     elif config['model_configuration'] == 'VAE3':
         model = models_tf.VAE3(number_of_input_channels = 1,
@@ -201,7 +198,15 @@ for cv in range(config['N_FOLDS']):
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size'],
-                        norm_layer=normalizer
+                        )
+    elif config['model_configuration'] == 'VAE4':
+        model = models_tf.VAE4(number_of_input_channels = 1,
+                        model_name=config['model_configuration'],
+                        num_classes = len(config['unique_labels']),
+                        data_augmentation=config['data_augmentation'],
+                        class_weights = config['class_weights'],
+                        kernel_size=config['kernel_size'],
+                        input_size=config['input_size']
                         )
     else:
         model = models_tf.LightOCT(number_of_input_channels = 1,
@@ -211,7 +216,6 @@ for cv in range(config['N_FOLDS']):
                         class_weights = config['class_weights'],
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size'],
-                        norm_layer=normalizer
                         )
 
     # train model
@@ -229,9 +233,9 @@ for cv in range(config['N_FOLDS']):
                             vae_kl_weight=config['vae_kl_weight'],
                             vae_reconst_weight=config['vae_reconst_weight'],
                             power = 0.1,
-                            max_epochs=5,
+                            max_epochs=3,
                             early_stopping=True,
-                            patience=5,
+                            patience=10,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             verbose=config['verbose']
@@ -245,9 +249,9 @@ for cv in range(config['N_FOLDS']):
                             start_learning_rate = config['learning_rate'],
                             scheduler = 'polynomial',
                             power = 0.1,
-                            max_epochs=5,
+                            max_epochs=3,
                             early_stopping=True,
-                            patience=5,
+                            patience=10,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             verbose=config['verbose']
@@ -266,13 +270,28 @@ for cv in range(config['N_FOLDS']):
                             power = 0.1,
                             max_epochs=500,
                             early_stopping=True,
-                            patience=500,
+                            patience=10,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             verbose=config['verbose']
                             )
         else:
-            utilities_models_tf.train(model,
+            # utilities_models_tf.train(model,
+            #                 train_dataset, val_dataset,
+            #                 classification_type =config['classification_type'],
+            #                 unique_labels = config['unique_labels'],
+            #                 loss=[config['loss']],
+            #                 start_learning_rate = config['learning_rate'],
+            #                 scheduler = 'polynomial',
+            #                 power = 0.1,
+            #                 max_epochs=500,
+            #                 early_stopping=True,
+            #                 patience=25,
+            #                 save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
+            #                 save_model_architecture_figure=True if cv==0 else False,
+            #                 verbose=config['verbose']
+            #                 )
+            utilities_models_tf.train_lookaheadOPT(model,
                             train_dataset, val_dataset,
                             classification_type =config['classification_type'],
                             unique_labels = config['unique_labels'],
@@ -282,11 +301,12 @@ for cv in range(config['N_FOLDS']):
                             power = 0.1,
                             max_epochs=500,
                             early_stopping=True,
-                            patience=500,
+                            patience=10,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             verbose=config['verbose']
                             )
+
 
     # test model
     print(' - Testing fold...')
