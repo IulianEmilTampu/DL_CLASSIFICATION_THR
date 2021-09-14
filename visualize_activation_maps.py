@@ -23,13 +23,6 @@ import importlib
 import numpy as np
 import matplotlib.pyplot as plt
 
-from imgaug import augmenters as iaa
-import imgaug as ia
-
-import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision import datasets, transforms, utils
-
 import tensorflow as tf
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import load_model
@@ -38,6 +31,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 
 # local imports
 import utilities
+import utilities_models_tf
 
 '''
 for in line implementation
@@ -55,73 +49,54 @@ args = vars(ap.parse_args())
 
 
 ## 1 load folders and information about the model
-model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/LightOCT_c2_isotropic_with_augmentation_batch800'
-# model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/M2_1_LeaveOneOut'
-fold = 1
-
-# data to work on
-dataset_path = {
-    'pytorch_gen':'/flush/iulta54/Research/Data/OCT/Thyroid/2D_classification_dataset_LeaveOneOut_anisotropic_per_class_organization/Test',
-    'tf_gen': '/flush/iulta54/Research/Data/OCT/Thyroid/2D_classification_dataset_anisotropic_TFR/Test'}
-
+model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/M4_c4_withMoreAugmentation'
 save_path = os.path.join(model_path, 'Gard-Cam')
-
 # check if save_path exists if not, create it
 if not os.path.isdir(save_path):
     os.mkdir(save_path)
 
-# open dataset information
-with open(os.path.join(model_path,'train_val_test_filenames_json.txt')) as json_file:
-    data = json.load(json_file)
-    image_files = data['Testing']
-    num_folds = len(data['Training'])
-    unique_labels = data['unique_labels']
-    try:
-        class_labels = data['class_labels']
-    except:
-        class_labels = range(len(unique_labels))
+# get dataset info from the configuration file
+from_configuration_file = True
 
-    # infere generator type by looking at the file extention
-    if pathlib.Path(image_files[0]).suffix == '.gz':
-        # this model has been trained using a pythorch generator
-        gen_type = 'pytorch_gen'
-    elif pathlib.Path(image_files[0]).suffix == '.tfrecords':
-        # this model has been trained using a tf generator
-        gen_type = 'tf_gen'
+if from_configuration_file:
+    model_name = os.path.basename(model_path)
+    trained_models_path = os.path.join(model_path,'trained_models')
+    dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning'
 
-# create string that contains label description
-class_description = ', '.join([str(i)+'='+c for i, c in enumerate(class_labels)])
+    # load configuration file
+    with open(os.path.join(model_path,'config.json')) as json_file:
+        config = json.load(json_file)
 
-# fix name of image_files
-if len(image_files[0]) > 50:
-    # filenames contain the full path. Change to load the data from the dataset_path
-    image_files = [os.path.join(dataset_path[gen_type], os.path.basename(os.path.dirname(x)),os.path.basename(x)) for x in image_files]
+    # take one testing. training and validation images (tr and val for fold specific fold)
+    # make sure that the files point to this system dataset
+    fold = 0
+    test_img = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in config['test']]
+    # test_img.pop(test_img.index('/flush/iulta54/Research/Data/OCT/MunichData/TH_WF/13112012_0049997762_07.jpeg'))
+    tr_img = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in config['training'][fold]]
+    val_img = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in config['validation'][fold]]
+
+    # some other settings
+    crop_size = config['input_size'] # (h, w)
+    class_description = ', '.join([str(i)+'='+c for i, c in enumerate(config['label_description'])])
 else:
-    if pathlib.Path(image_files[0]).suffix == '.gz':
-        image_files = [os.path.join(dataset_path[gen_type], 'class_'+ x[-8], x) for x in image_files]
-    elif pathlib.Path(image_files[0]).suffix == '.tfrecords':
-        image_files = [os.path.join(dataset_path[gen_type], 'class_'+ x[-11], x) for x in image_files]
+    # specify manually the files to show
+    test_img = []
+    tr_img = []
+    val_img = []
+    crop_size = []
 
-# open general model information
-with open(os.path.join(model_path,'fold_'+str(fold), 'model_summary_json.txt')) as json_file:
-    data = json.load(json_file)
-    model_name = data['Model_name']
+    # dataset_path = '/home/iulta54/Desktop/Testing/TH_DL_dummy_dataset/Created/LigthOCT_TEST_isotropic_20000s'
+    # file_names = glob.glob(os.path.join(dataset_path, '*'))
+    # c_type='c1'
+    # file_names, labels, organized_files = utilities.get_organized_files(file_names, c_type, categorical=False)
 
-
-## 2 create dataset we want to use from getting the images to inspect
+## 2 create dataset we want to use for getting the images to inspect
 importlib.reload(utilities)
+importlib.reload(utilities_models_tf)
 
-seed = 29
-crop_size = (200,200) # (h, w)
-batch_size = 240
-
-seq = iaa.Sequential([
-    iaa.Resize({'height': crop_size[0], 'width': crop_size[1]})
-], random_order=False) # apply augmenters in random order
-
-transformer = transforms.Compose([
-    utilities.ChannelFix(channel_order='last')
-    ])
+seed = 29122009
+batch_size = 200
+images_to_show = 2000
 
 # check data coming out of the generators
 debug = True
@@ -129,74 +104,61 @@ show = True
 model_to_check = 0
 
 if debug is True:
-    # check what type of generator the model needs and build it
-    if gen_type == 'pytorch_gen':
-        # build pytorch generator
-        transformer_d = transforms.Compose([
-            utilities.ChannelFix(channel_order='first')
-            ])
-        test_dataset_debug = utilities.OCTDataset2D_classification(image_files,
-                    unique_labels,
-                    transform=transformer_d,
-                    augmentor=seq)
-        test_dataset_debug = DataLoader(test_dataset_debug, batch_size=18,
-                                shuffle=True, num_workers=0, pin_memory=True)
-        sample = next(iter(test_dataset_debug))
-
-        # show images if needed
-        if show == True:
-            utilities.show_batch_2D(sample)
-    if gen_type == 'tf_gen':
-        # build tf generator
-        test_dataset_debug = utilities.TFR_2D_dataset(image_files,
-                        dataset_type = 'train',
-                        batch_size=18,
-                        buffer_size=1000,
-                        crop_size=(crop_size[0], crop_size[1]))
+        test_dataset_debug = utilities.TFR_2D_dataset(test_img,
+                    dataset_type = 'test',
+                    batch_size=batch_size,
+                    buffer_size=5000,
+                    crop_size=crop_size)
         x, y = next(iter(test_dataset_debug))
         if show == True:
+            y = utilities_models_tf.fix_labels_v2(y.numpy(), classification_type='c3', unique_labels=config['unique_labels'], categorical=False)
             sample = (x.numpy(), y.numpy())
             utilities.show_batch_2D(sample)
 
 # create generator based on model specifications
-if gen_type == 'pytorch_gen':
-    test_dataset = utilities.OCTDataset2D_classification(image_files,
-            unique_labels,
-            transform=transformer,
-            augmentor=seq)
-    test_dataset = DataLoader(test_dataset, batch_size=batch_size,
-                            shuffle=False, num_workers=0, pin_memory=True)
-elif gen_type == 'tf_gen':
-    test_dataset = utilities.TFR_2D_dataset(image_files,
-                    dataset_type = 'train',
-                    batch_size=batch_size,
-                    buffer_size=1000,
-                    crop_size=(crop_size[0], crop_size[1]))
-
-images, labels = next(iter(test_dataset))
+test_dataset = utilities.TFR_2D_dataset(test_img,
+                dataset_type = 'test',
+                batch_size=batch_size,
+                buffer_size=1000,
+                crop_size=crop_size)
 
 ## 3 load model
 # load model
-if os.path.exists(os.path.join(model_path, 'fold_' + str(fold), 'model.h5')):
-    model = load_model(os.path.join(model_path, 'fold_' + str(fold), 'model.h5'), compile=False)
-elif os.path.join(model_path, 'fold_' + str(fold), 'model.tf'):
-    model = load_model(os.path.join(model_path, 'fold_' + str(fold), 'model.tf'), compile=False)
+if os.path.exists(os.path.join(model_path, 'fold_' + str(fold+1), 'model.tf')):
+    model = tf.keras.models.load_model(os.path.join(model_path, 'fold_' + str(fold+1), 'model.tf'), compile=False)
 else:
     raise Exception('Model not found')
-
-# compute model predicion on batch of images
-
-image_logits = model(images)
-if type(image_logits) is list:
-    # the model is a VEA, taking only the prediction
-    image_logits = image_logits[4].numpy()
-else:
-    image_logits = image_logits.numpy()
 
 debug = True
 if debug is True:
     for layer in reversed(model.layers):
         print(layer.name, layer.output_shape)
+
+##  compute model predicion on images until reached the number to show
+images = []
+pred_logits = tf.zeros([0, len(config['unique_labels'])])
+labels = tf.zeros([0, len(config['unique_labels'])])
+
+for x, y in test_dataset:
+    # get prediction
+    y_logits = model(x)
+    # save images for later
+    images.extend(x.numpy())
+    # save predictions taking into consideration VAE models
+    if type(y_logits) is list:
+        # the model is a VEA, taking only the prediction
+        y_logits = y_logits[0]
+    pred_logits = tf.concat([pred_logits, y_logits], axis=0)
+    # save gt
+    labels = tf.concat([labels, utilities_models_tf.fix_labels_v2(y.numpy(), 'c3', config['unique_labels'])], axis=0)
+
+    # stop is reached the number of images to show
+    if pred_logits.numpy().shape[0] >= images_to_show:
+        break
+
+images = np.array(images)
+labels = np.argmax(labels.numpy(), axis=-1)
+# pred_logits = np.argmax(pred_logits.numpy(), axis=-1)
 
 ## 4.1 - Plot activation for the predicted class for consecutive layers (from shallow to deep)
 importlib.reload(utilities)
@@ -238,18 +200,19 @@ print('Found {} layers -> {}'.format(len(name_layers), name_layers))
 # looking at large models with many layers
 
 conv_to_show = None
-# conv_to_show = [0,3,6,9,11]
+conv_to_show = [-2,-1]
 
 if conv_to_show is not None:
     name_layers = [name_layers[i] for i in conv_to_show]
 else:
     conv_to_show = [(i+1) for i, _ in enumerate(name_layers)]
 
+
 # compute activation maps for each image and each network layer
 for i in range(images.shape[0]):
     print('Computing activation maps for each layer for the predicted class: {}/{} \r'.format(i, images.shape[0]), end='')
     image = np.expand_dims(images[i], axis=0)
-    c = np.argmax(image_logits[i])
+    c = np.argmax(pred_logits[i])
     # for all the images, compute heatmap for all the layers
     heatmap_raw.append([])
     heatmap_rgb.append([])
@@ -281,10 +244,10 @@ for i in range(n_images):
 
         # original image
         axes[j, 0].imshow(np.squeeze(images[idx]), cmap='gray', interpolation=None)
-        if labels[idx].numpy() == np.argmax(image_logits[idx]):
-            axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx].numpy(),np.argmax(image_logits[idx])), color='g')
+        if labels[idx] == np.argmax(pred_logits[idx]):
+            axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx],np.argmax(pred_logits[idx])), color='g')
         else:
-            axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx].numpy(),np.argmax(image_logits[idx])), color='r')
+            axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx],np.argmax(pred_logits[idx])), color='r')
 
         axes[j, 0].set_xticks([])
         axes[j, 0].set_yticks([])
@@ -375,10 +338,10 @@ for i in range(n_images):
 
         # original image
         axes[j, 0].imshow(np.squeeze(images[idx]), cmap='gray', interpolation=None)
-        if labels[idx].numpy() == np.argmax(image_logits[idx]):
-            axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx].numpy(),np.argmax(image_logits[idx])), color='g')
+        if labels[idx] == np.argmax(pred_logits[idx]):
+            axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx],np.argmax(pred_logits[idx])), color='g')
         else:
-            axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx].numpy(),np.argmax(image_logits[idx])), color='r')
+            axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx],np.argmax(pred_logits[idx])), color='r')
 
         axes[j, 0].set_xticks([])
         axes[j, 0].set_yticks([])
@@ -386,10 +349,10 @@ for i in range(n_images):
         # class heatmaps
         for idx1, c in enumerate(classes_to_show):
             im = axes[j, idx1+1].imshow(heatmap_raw[idx][c]/255, cmap='jet', vmin=0, vmax=1, interpolation=None)
-            if c == np.argmax(image_logits[idx]):
-                axes[j, idx1+1].set_title('class_{} - prob. {:05.3f}'.format(c, image_logits[idx, c]), fontweight='bold')
+            if c == np.argmax(pred_logits[idx]):
+                axes[j, idx1+1].set_title('class_{} - prob. {:05.3f}'.format(c, pred_logits[idx, c]), fontweight='bold')
             else:
-                axes[j, idx1+1].set_title('class_{} - prob. {:05.3f}'.format(c, image_logits[idx, c]))
+                axes[j, idx1+1].set_title('class_{} - prob. {:05.3f}'.format(c, pred_logits[idx, c]))
             axes[j, idx1+1].set_xticks([])
             axes[j, idx1+1].set_yticks([])
 
@@ -416,7 +379,7 @@ if save is not True:
 # idx = 3
 # image = np.expand_dims(images[idx], axis=0)
 # label = labels[idx].numpy()
-# pred = np.argmax(image_logits[idx])
+# pred = np.argmax(pred_logits[idx])
 #
 #
 # # initialize our gradient class activation map and build the heatmap

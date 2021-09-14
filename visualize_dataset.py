@@ -32,9 +32,9 @@ import utilities_models_tf
 from_configuration_file = True
 
 if from_configuration_file:
-    model_name = 'LightOCT_rollback'
+    model_name = 'M4_c4_withMoreAugmentation'
     trained_models_path = '/flush/iulta54/Research/P3-THR_DL/trained_models'
-    dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning'
+    dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/'
 
     # load configuration file
     with open(os.path.join(trained_models_path, model_name,'config.json')) as json_file:
@@ -62,16 +62,16 @@ examples_to_show = 50
 importlib.reload(utilities)
 
 # build tf generator
-test_dataloader = utilities.TFR_2D_dataset(tr_img,
-                dataset_type = 'train',
+test_dataloader = utilities.TFR_2D_dataset(test_img,
+                dataset_type = 'test',
                 batch_size=examples_to_show,
                 buffer_size=5000,
-                crop_size=(crop_size[0], crop_size[1]))
+                crop_size=crop_size)
 
-# set normalization layer on the training dataset
-tr_feature_ds = test_dataloader.map(tf.autograph.experimental.do_not_convert(lambda x, y: x))
-normalizer = layers.experimental.preprocessing.Normalization(axis=-1)
-normalizer.adapt(tr_feature_ds)
+# # set normalization layer on the training dataset
+# tr_feature_ds = test_dataloader.map(tf.autograph.experimental.do_not_convert(lambda x, y: x))
+# normalizer = layers.experimental.preprocessing.Normalization(axis=-1)
+# normalizer.adapt(tr_feature_ds)
 
 augmentor = tf.keras.Sequential([layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
                 layers.experimental.preprocessing.RandomRotation(0.02)],
@@ -83,22 +83,19 @@ importlib.reload(utilities)
 x, y = next(iter(test_dataloader))
 
 # x = normalizer(x)
-x = augmentor(x, training=False)
-y = utilities_models_tf.fix_labels_v2(y.numpy(), classification_type=config['classification_type'], unique_labels=config['unique_labels'], categorical=False)
+# x = augmentor(x, training=False)
+y = utilities_models_tf.fix_labels_v2(y.numpy(), classification_type='c3', unique_labels=config['unique_labels'], categorical=False)
 sample = (x.numpy(), y.numpy())
 
 print(f'{"Mean:":5s}{x.numpy().mean():0.2f}')
 print(f'{"STD:":5s}{x.numpy().std():0.2f}')
 
-utilities.show_batch_2D(sample, img_per_row=5)
+utilities.show_batch_2D(sample, img_per_row=10)
 
 ## show examples with histogram
 importlib.reload(utilities)
 
 utilities.show_batch_2D_with_histogram(sample)
-
-
-
 
 
 
