@@ -299,10 +299,10 @@ What we need to parce is
 
 # parse variables
 data_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/raw_data'
-destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/'
+destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/NEW_TFR'
 spatial_size = [1.4, 2.0]
 isotropic_res = 0.007
-dataset_specs = '/flush/iulta54/Research/P3-THR_DL/annotation_information.csv'
+dataset_specs = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/raw_dataannotation_information.csv'
 
 
 
