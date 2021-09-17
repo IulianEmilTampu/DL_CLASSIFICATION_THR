@@ -84,12 +84,19 @@ class RandomBrightness(base_layer.Layer):
 
 ## augmentation pipeline
 
+# def augmentor(inputs):
+#     aug = tf.keras.Sequential([
+#             layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+#             layers.experimental.preprocessing.RandomRotation(0.02),
+#             layers.experimental.preprocessing.RandomContrast(factor=0.8),
+#             RandomBrightness(0.5)],
+#             name='Augmentation')
+#     return aug(inputs)
+
 def augmentor(inputs):
     aug = tf.keras.Sequential([
             layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-            layers.experimental.preprocessing.RandomRotation(0.02),
-            layers.experimental.preprocessing.RandomContrast(factor=0.8),
-            RandomBrightness(0.5)],
+            layers.experimental.preprocessing.RandomRotation(0.02)],
             name='Augmentation')
     return aug(inputs)
 
@@ -242,7 +249,7 @@ def plotModelPerformance(tr_loss, tr_acc, val_loss, val_acc, save_path, display=
     else:
         plt.close()
 
-def plotModelPerformance_v2(tr_loss, tr_acc, val_loss, val_acc, tr_f1, val_f1, save_path, display=False):
+def plotModelPerformance_v2(tr_loss, tr_acc, val_loss, val_acc, tr_f1, val_f1, save_path, display=False, best_epoch=None):
     '''
     Saves training and validation curves.
     INPUTS
@@ -272,11 +279,18 @@ def plotModelPerformance_v2(tr_loss, tr_acc, val_loss, val_acc, tr_f1, val_f1, s
     l4 = ax2.plot(val_acc, colors[3], ls=line_style[3])
     l5 = ax2.plot(tr_f1, colors[4], ls=line_style[2])
     l6 = ax2.plot(val_f1, colors[5], ls=line_style[3])
+    if best_epoch:
+        l7 = ax2.axvline(x=best_epoch)
 
     # add legend
-    lns = l1+l2+l3+l4+l5+l6
-    labs = ['Training loss', 'Validation loss', 'Training accuracy', 'Validation accuracy', 'Training F1-score', 'Validation F1-score']
-    ax1.legend(lns, labs, loc=7, fontsize=15)
+    if best_epoch:
+        lns = l1+l2+l3+l4+l5+l6+l7
+        labs = ['Training loss', 'Validation loss', 'Training accuracy', 'Validation accuracy', 'Training F1-score', 'Validation F1-score', 'Best_model']
+        ax1.legend(lns, labs, loc=7, fontsize=15)
+    else:
+        lns = l1+l2+l3+l4+l5+l6
+        labs = ['Training loss', 'Validation loss', 'Training accuracy', 'Validation accuracy', 'Training F1-score', 'Validation F1-score']
+        ax1.legend(lns, labs, loc=7, fontsize=15)
 
     ax1.set_title('Training loss, accuracy and F1-score trends', fontsize=20)
     ax1.grid()
@@ -336,6 +350,14 @@ def plotVAEreconstruction(original, reconstructed, epoch, save_path, display=Fal
                     reconstructed[0,:,:,0].max()))
     ax[1][0].set_xticks([])
     ax[1][0].set_yticks([])
+
+    ax[1][1].imshow(reconstructed[1,:,:,0], cmap='gray', interpolation=None)
+    ax[1][1].set_title('Mean {:.03f}, min {:.03f}, max {:.03f}'
+            .format(reconstructed[1,:,:,0].mean(),
+                    reconstructed[1,:,:,0].min(),
+                    reconstructed[1,:,:,0].max()))
+    ax[1][1].set_xticks([])
+    ax[1][1].set_yticks([])
 
     # # ################## Original hist plotting
     # ax[2][0].hist(original[0,:,:,0].ravel(), bins=256)
@@ -407,6 +429,9 @@ def train(self, training_dataloader,
                 max_epochs=200,
                 early_stopping=True,
                 patience=20,
+                warm_up=True,
+                warm_up_learning_rate=0.00001,
+                warm_up_epochs=15,
                 save_model_path=os.getcwd(),
                 save_model_architecture_figure=True,
                 verbose=1):
@@ -422,6 +447,7 @@ def train(self, training_dataloader,
     self.unique_labels=unique_labels
     self.classification_type=classification_type
     self.save_model_path=save_model_path
+    self.best_epoch = 0
 
     if verbose <= 2 and isinstance(verbose, int):
         self.verbose=verbose
@@ -491,280 +517,21 @@ def train(self, training_dataloader,
         else:
             raise TypeError('Invalid scheduler. given {} but expected linear or polynomial'.format(self.scheduler))
 
-        lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
-        self.learning_rate_history.append(lr)
+        # check if gradient warm-up is needed
+        if warm_up is True and epoch < warm_up_epochs:
+            lr = (warm_up_learning_rate*epoch)/warm_up_epochs
+            self.learning_rate_history.append(lr)
+        else:
+            if warm_up is True:
+                # do not count the number of epochs used for warm_up
+                lr = leraningRateScheduler(self.initial_learning_rate, epoch-warm_up_epochs, self.maxEpochs, power)
+            else:
+                lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
+            self.learning_rate_history.append(lr)
 
         # set optimizer - using ADAM by default
         # optimizer = Adam(learning_rate=lr)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-
-        # ####### TRAINING
-        step = 0
-        for x, y in training_dataloader:
-            step += 1
-
-            # fix labels
-            y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels, categorical=False)
-
-            # save information about training image size
-            if epoch == 0 and step == 1:
-                self.batch_size = x.shape[0]
-                self.input_size = (x.shape[1], x.shape[2])
-
-            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
-            # import utilities
-            #
-            # y_, aug = self.model(x, training=True)
-            # utilities.show_batch_2D_with_histogram((aug.numpy(), y.numpy()))
-            # sys.exit()
-            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
-
-            train_loss, grads = grad(self.model, x, y)
-
-            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
-            # print(grads[-1])
-            #
-            # optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-            # train_loss, grads = grad(self.model, x, y)
-            # print(grads[-1])
-            #
-            # sys.exit()
-            # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
-
-            optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-
-            # Track loss and accuracy
-            tr_epoch_loss_avg.update_state(train_loss)
-            tr_epoch_accuracy.update_state(y, self.model(x, training=True))
-            tr_epoch_f1.update_state(to_categorical(y, num_classes=self.num_classes), self.model(x, training=True))
-
-            # print values
-            if self.verbose == 2:
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} training -> {:04d}/unknown -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f}\r'
-                            .format(epoch+1,
-                                step,
-                                tr_epoch_loss_avg.result(),
-                                tr_epoch_accuracy.result(),
-                                tr_epoch_f1.result()),
-                            end='')
-                else:
-                    print('Epoch {:04d} training -> {:04d}/{:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f} \r'
-                            .format(epoch+1,
-                                    step,
-                                    self.num_training_samples//self.batch_size,
-                                    tr_epoch_loss_avg.result(),
-                                    tr_epoch_accuracy.result(),
-                                    tr_epoch_f1.result()),
-                            end='')
-
-        # finisced all the training batches -> save training loss
-        self.train_loss_history.append(tr_epoch_loss_avg.result().numpy().astype(float))
-        self.train_accuracy_history.append(tr_epoch_accuracy.result().numpy().astype(float))
-        self.train_f1_history.append(tr_epoch_f1.result().numpy().astype(float))
-
-        if epoch == 0:
-            self.num_training_samples = self.batch_size*step
-
-        # ########### VALIDATION
-        step = 0
-        for x, y in validation_dataloader:
-            step += 1
-
-            # fix labels
-            y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels, categorical=False)
-
-            val_loss = classificationLoss(self.model, x, y, training=False)
-
-            # track progress
-            val_epoch_loss_avg.update_state(val_loss)
-            val_epoch_accuracy.update_state(y, self.model(x, training=False))
-            val_epoch_f1.update_state(to_categorical(y, num_classes=self.num_classes), self.model(x, training=False))
-
-            # print values
-            if self.verbose == 2:
-                if epoch == 0:
-                    print('\r', end='')
-                    print('Epoch {:04d} validation -> {:04d}/unknown -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f}\r'
-                            .format(epoch+1,
-                                    step,
-                                    val_epoch_loss_avg.result(),
-                                    val_epoch_accuracy.result(),
-                                    val_epoch_f1.result()),
-                                end='')
-                else:
-                    print('Epoch {:04d} validation -> {:04d}/{:04d} -> val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f}\r'
-                            .format(epoch+1,
-                                step,
-                                self.num_validation_samples//self.batch_size,
-                                val_epoch_loss_avg.result(),
-                                val_epoch_accuracy.result(),
-                                val_epoch_f1.result()),
-                            end='')
-
-
-        # finisced all the batches in the validation
-        self.val_loss_history.append(val_epoch_loss_avg.result().numpy().astype(float))
-        self.val_accuracy_history.append(val_epoch_accuracy.result().numpy().astype(float))
-        self.val_f1_history.append(val_epoch_f1.result().numpy().astype(float))
-
-
-        if self.verbose == 1 or self.verbose == 2:
-            print('Epoch {:04d} -> tr_loss:{:.4f}, tr_acc:{:.4f}, tr_f1:{:.4f}, val_loss:{:.4f}, val_acc:{:.4f}, val_f1:{:.4f}'.format(epoch+1,
-                            self.train_loss_history[-1], self.train_accuracy_history[-1], self.train_f1_history[-1],
-                            self.val_loss_history[-1], self.val_accuracy_history[-1],  self.val_f1_history[-1]))
-        if epoch == 0:
-            self.num_validation_samples = self.batch_size*step
-
-        if epoch % 2 == 0:
-            # plotModelPerformance(self.train_loss_history,
-            #                         self.train_accuracy_history,
-            #                         self.val_loss_history,
-            #                         self.val_accuracy_history,
-            #                         self.save_model_path,
-            #                         display=False)
-
-            plotModelPerformance_v2(self.train_loss_history,
-                                    self.train_accuracy_history,
-                                    self.val_loss_history,
-                                    self.val_accuracy_history,
-                                    self.train_f1_history,
-                                    self.val_f1_history,
-                                    self.save_model_path,
-                                    display=False)
-
-            plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
-
-        if early_stopping:
-            # check if model accurary improved, and update counter if needed
-            if self.val_f1_history[-1] > self.best_f1:
-                # save model checkpoint
-                if self.verbose == 1 or self.verbose == 2:
-                    print(' - Saving model checkpoint in {}'.format(self.save_model_path))
-                # save some extra parameters
-
-                stop = time.time()
-                self.training_time, _ = tictoc(start, stop)
-                self.training_epochs = epoch
-                self.best_acc = self.val_accuracy_history[-1]
-                self.best_f1 = self.val_f1_history[-1]
-
-                # save model
-                save_model(self)
-
-                # reset counter
-                n_wait = 0
-            else:
-                n_wait += 1
-            # check max waiting is reached
-            if n_wait == patience:
-                if self.verbose == 1 or self.verbose == 2:
-                    print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
-                break
-
-
-## training routine for not VAE models using lookahead optimizer
-
-def train_lookaheadOPT(self, training_dataloader,
-                validation_dataloader,
-                unique_labels,
-                classification_type,
-                loss=('cee'),
-                start_learning_rate = 0.001,
-                scheduler='polynomial',
-                power=0.1,
-                max_epochs=200,
-                early_stopping=True,
-                patience=20,
-                save_model_path=os.getcwd(),
-                save_model_architecture_figure=True,
-                verbose=1):
-
-    # define parameters useful to store training and validation information
-    self.initial_learning_rate = start_learning_rate
-    self.scheduler = scheduler
-    self.maxEpochs = max_epochs
-    self.learning_rate_history = []
-    self.loss = loss
-    self.num_validation_samples = 0
-    self.num_training_samples = 0
-    self.unique_labels=unique_labels
-    self.classification_type=classification_type
-    self.save_model_path=save_model_path
-
-    if verbose <= 2 and isinstance(verbose, int):
-        self.verbose=verbose
-    else:
-        print('Invalid verbose parameter. Given {} but expected 0, 1 or 2. Setting to default 1'.format(verbose))
-
-    # save model architecture figure
-    if save_model_architecture_figure is True:
-        try:
-            tf.keras.utils.plot_model(self.model, to_file=os.path.join(self.save_model_path, 'model_architecture.png'), show_shapes=True)
-        except:
-            print('Cannot save model architecture as figure. Printing instead.')
-            self.model.summary()
-
-    if early_stopping:
-        self.best_acc = 0.0
-        self.best_f1 = 0.0
-        n_wait = 0
-
-    classification_loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-    mse = tf.keras.losses.MeanSquaredError()
-
-    def classificationLoss(model, x, y, training):
-        # training=training is needed only if there are layers with different
-        # behavior during training versus inference (e.g. Dropout).
-        y_= model(x, training=training)
-        return classification_loss_object(y_true=y, y_pred=y_)
-
-    def grad(model, inputs, targets):
-        with tf.GradientTape() as tape:
-            loss_value = classificationLoss(model, inputs, targets, training=True)
-        return loss_value, tape.gradient(loss_value, model.trainable_variables)
-
-    # Keep results for plotting
-    self.train_loss_history = []
-    self.train_accuracy_history = []
-    self.val_loss_history = []
-    self.val_accuracy_history = []
-    self.train_f1_history = []
-    self.val_f1_history = []
-    start = time.time()
-
-    # initialize the variables
-    tr_epoch_loss_avg = tf.keras.metrics.Mean()
-    tr_epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
-    tr_epoch_f1 = tfa.metrics.F1Score(num_classes=self.num_classes, average='macro')
-    val_epoch_loss_avg = tf.keras.metrics.Mean()
-    val_epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
-    val_epoch_f1 = tfa.metrics.F1Score(num_classes=self.num_classes, average='macro')
-
-
-    # start looping through the epochs
-    for epoch in range(self.maxEpochs):
-        # reset metrics (keep only values for one epoch at the time)
-        tr_epoch_loss_avg.reset_states()
-        tr_epoch_accuracy.reset_states()
-        tr_epoch_f1.reset_states()
-        val_epoch_loss_avg.reset_states()
-        val_epoch_accuracy.reset_states()
-        val_epoch_f1.reset_states()
-
-        # compute learning rate based on the scheduler
-        if self.scheduler == 'linear':
-            self.power = 1
-        elif self.scheduler == 'polynomial':
-            self.power = power
-        else:
-            raise TypeError('Invalid scheduler. given {} but expected linear or polynomial'.format(self.scheduler))
-
-        lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
-        self.learning_rate_history.append(lr)
-
-        # set optimizer - using the Range optimizer
+        # optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
         optimizer = tfa.optimizers.RectifiedAdam(learning_rate=lr)
         optimizer = tfa.optimizers.Lookahead(optimizer=optimizer, sync_period=6, slow_step_size=0.5)
 
@@ -902,6 +669,7 @@ def train_lookaheadOPT(self, training_dataloader,
                                     self.train_f1_history,
                                     self.val_f1_history,
                                     self.save_model_path,
+                                    best_epoch=None,
                                     display=False)
 
             plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
@@ -919,6 +687,7 @@ def train_lookaheadOPT(self, training_dataloader,
                 self.training_epochs = epoch
                 self.best_acc = self.val_accuracy_history[-1]
                 self.best_f1 = self.val_f1_history[-1]
+                self.best_epoch = epoch
 
                 # save model
                 save_model(self)
@@ -926,7 +695,11 @@ def train_lookaheadOPT(self, training_dataloader,
                 # reset counter
                 n_wait = 0
             else:
-                n_wait += 1
+                if warm_up is True:
+                    if epoch > warm_up_epochs:
+                        n_wait += 1
+                else:
+                    n_wait += 1
             # check max waiting is reached
             if n_wait == patience:
                 if self.verbose == 1 or self.verbose == 2:
@@ -948,6 +721,9 @@ def train_VAE(self, training_dataloader,
                 max_epochs=200,
                 early_stopping=True,
                 patience=20,
+                warm_up = True,
+                warm_up_epochs = 15,
+                warm_up_learning_rate=0.00001,
                 save_model_path=os.getcwd(),
                 save_model_architecture_figure=True,
                 verbose=1):
@@ -965,6 +741,7 @@ def train_VAE(self, training_dataloader,
     self.save_model_path=save_model_path
     self.unique_labels = unique_labels
     self.classification_type = classification_type
+    self.best_epoch = 0
 
     if verbose <= 2 and isinstance(verbose, int):
         self.verbose=verbose
@@ -1054,12 +831,23 @@ def train_VAE(self, training_dataloader,
         else:
             raise TypeError('Invalid scheduler. given {} but expected linear or polynomial'.format(self.scheduler))
 
-        lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
-        self.learning_rate_history.append(lr)
+        # check if gradient warm-up is needed
+        if warm_up is True and epoch < warm_up_epochs:
+            lr = (warm_up_learning_rate*epoch)/warm_up_epochs
+            self.learning_rate_history.append(lr)
+        else:
+            if warm_up is True:
+                # do not count the number of epochs used for warm_up
+                lr = leraningRateScheduler(self.initial_learning_rate, epoch-warm_up_epochs, self.maxEpochs, power)
+            else:
+                lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
+            self.learning_rate_history.append(lr)
 
         # set optimizer - using ADAM by default
         # optimizer = Adam(learning_rate=lr)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+        # optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+        optimizer = tfa.optimizers.RectifiedAdam(learning_rate=lr)
+        optimizer = tfa.optimizers.Lookahead(optimizer=optimizer, sync_period=6, slow_step_size=0.5)
 
         # ####### TRAINING
         step = 0
@@ -1178,6 +966,7 @@ def train_VAE(self, training_dataloader,
                                     self.train_f1_history,
                                     self.val_f1_history,
                                     self.save_model_path,
+                                    best_epoch =None,
                                     display=False)
 
             plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
@@ -1198,6 +987,7 @@ def train_VAE(self, training_dataloader,
                 self.training_epochs = epoch
                 self.best_acc = self.val_accuracy_history[-1]
                 self.best_f1 = self.val_f1_history[-1]
+                self.best_epoch = epoch
 
                 # save model
                 save_model(self)
@@ -1205,7 +995,11 @@ def train_VAE(self, training_dataloader,
                 # reset counter
                 n_wait = 0
             else:
-                n_wait += 1
+                if warm_up is True:
+                    if epoch > warm_up_epochs:
+                        n_wait += 1
+                else:
+                    n_wait += 1
             # check max waiting is reached
             if n_wait == patience:
                 if self.verbose == 1 or self.verbose == 2:
@@ -1288,6 +1082,8 @@ def save_model(self):
         'Input_size' : self.input_size,
         'Class_weights': self.class_weights.tolist() if not isinstance(self.class_weights, list) else self.class_weights,
         'Custom_model': self.custom_model,
+        'Dropout_rate': self.dropout_rate if hasattr(self, 'dropout_rate') else 'NaN',
+        'Normalization': self.normalization if hasattr(self, 'normalization') else 'NaN',
         'Model_depth' : int(self.depth),
         'Num_filter_start' : self.num_filter_start,
         'Kernel_size' : list(self.kernel_size),
