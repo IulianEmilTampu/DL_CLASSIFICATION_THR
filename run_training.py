@@ -426,6 +426,8 @@ test_summary['true_positive_rate'] = tpr
 # test_summary['true_positive_rate_micro_avg'] = tpr['micro'].tolist()
 # test_summary['true_positive_rate_macro_avg'] = tpr['macro'].tolist()
 
+test_summary['roc_auc'] = roc_auc
+
 test_summary['precision'] = precision
 # test_summary['precision'] = [precision[i].tolist() for i in range(len(class_labels))]
 # test_summary['precision_micro_avg'] = precision['micro'].tolist()
