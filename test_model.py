@@ -1,17 +1,19 @@
 '''
-Script that tests a trained models on the training dataset. It returns:
-¤ overall accuracy of each model
-¤ accuracy for each independend class
-¤ confusion matrix for each model
-¤ ROC curve that compares the models
-¤ (ROC curve that compars the folds of each model)
+Script that tests a trained models on its training dataset. It does the same
+testing routine as the one in the overall run_training.py script.
+It saves
+¤ the information about the test for easy later plotting
+¤ ROC (per-class and overall using micro and macro average)
+¤ PP curve (per-class and overall using micro and macro average)
+¤ summary of performance for easy read of the final scores
 
 Steps
 1 - get paths and models to test
 2 - load testing dataset
-3 - run throught the cross-validation folds and compute predictions for all images
+3 - get predictions using the test function in the utilities_models_tf.py
 4 - plot and save confusion matrix
 5 - plot and save ROC curve
+6 - save detailed info of the testing and summary
 '''
 
 import os
@@ -32,13 +34,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
-from imgaug import augmenters as iaa
-import imgaug as ia
-
-import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision import datasets, transforms, utils
-
 import tensorflow as tf
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import load_model
@@ -47,269 +42,293 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 
 # local imports
 import utilities
+import utilities_models_tf
 
 ## 1 - get models information and additional files
-base_folder = '/flush/iulta54/Research/P3-THR_DL/trained_models'
-# dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019/2D_classification_dataset_per_class_organization/Test'
-# dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019/2D_classification_dataset_LeaveOneOut_per_class_organization/Test'
+model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/LigthOCT_c1_anisotropic_wa'
+dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning'
 
-dataset_path = {
-    'pytorch_gen':'/flush/iulta54/Research/Data/OCT/Thyroid/2D_classification_anisotropic/Test',
-    'tf_gen': '/flush/iulta54/Research/Data/OCT/Thyroid/2D_classification_dataset_isotropic_TFR/Test'}
+# check forlders
+if not os.path.isdir(model_path):
+    raise ValueError(f'Model not found. Given {model_path}')
+else:
+    # check that the configuration file is in place
+    if not os.path.isfile(os.path.join(model_path,'config.json')):
+        raise ValueError(f'Configuration file not found for the given model. Check that the model was configured and trained. Given {os.path.join(model_path,"config.json")}')
 
-# here specify which model or models to test
-
-# ¤¤¤¤¤¤¤¤¤¤¤¤¤¤ NORMAL vs DISEASE
-# models = ['M1_1_LeaveOneOut', 'M2_1_LeaveOneOut','M3_1_LeaveOneOut']
-# model_descriptions = ['LightOCT', '3_layer_model','2_layer_model_convconv']
-
-# ¤¤¤¤¤¤¤¤¤¤¤¤¤¤ NORMAL vs ENLARGED vs DEPLETED
-# models = ['M1_2_LeaveOneOut', 'M2_2_LeaveOneOut','M3_2_LeaveOneOut']
-# model_descriptions = ['LightOCT', '3_layer_model','2_layer_model_convconv']
-
-# ¤¤¤¤¤¤¤¤¤¤¤¤¤¤ NORMAL vs ALL DISEASES
-# models = ['M1_3_LeaveOneOut', 'M2_3_LeaveOneOut','M3_3_LeaveOneOut']
-# model_descriptions = ['LightOCT', '3_layer_model','2_layer_model_convconv']
-
-# ¤¤¤¤¤¤¤¤¤¤¤¤¤¤ ResNet
-# models = ['ResNet50_1_LeaveOneOut_anisotropic']
-# model_description = ['ResNet50']
-
-# ¤¤¤¤¤¤¤¤¤¤¤¤¤ weighted loss
-# model = ['M1_2_LeaveOneOut_anisotropic_wcce', 'M2_2_LeaveOneOut_anisotropic_wcce', 'M3_2_LeaveOneOut_anisotropic_wcce']
-# model_description = ['M1', 'M2', 'M3']
-
-# ¤¤¤¤¤¤¤¤¤¤¤¤¤ Variational autoencoders
-# model = ['VAE_3_TFR']
-# model_description = ['VAE']
-
-# ¤¤¤¤¤¤¤¤¤¤¤¤¤ Variational autoencoders
-# model = ['VAE_3_TFR']
-# model_description = ['VAE']
-
-# ¤¤¤¤¤¤¤¤¤¤¤¤¤
-model = ['LightOCT_c3_isotropic_wa_lr0001_batch400', 'ResNet50_c3_isotropic_wa_lr0001_batch50', 'VAE_original_c3_isotropic_wa_lsd128']
-
-model_description = ['LightOCT', 'ResNet50', 'VAE_original']
-
-
-
+if not os.path.isdir(dataset_path):
+    raise ValueError(f'Model not found. Given {dataset_path}')
 
 ## 2 - load testing dataset
 importlib.reload(utilities)
 
-# given that now models have been trained using both pytorch and tf data generators,
-# every model will have to have its own list of test files
+# load configuration file
+with open(os.path.join(model_path,'config.json')) as json_file:
+    config = json.load(json_file)
 
-models = []
+    # take one testing
+    # make sure that the files point to this system dataset
+    test_img = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in config['test']]
 
-for m in range(len(model)):
-    # open dataset information
-    with open(os.path.join(base_folder, model[m],'train_val_test_filenames_json.txt')) as json_file:
-        data = json.load(json_file)
-        image_files = data['Testing']
-        num_folds = len(data['Training'])
-        unique_labels = data['unique_labels']
-        try:
-            class_labels = data['class_labels']
-        except:
-            class_labels = range(len(unique_labels))
+# create generator based on model specifications
+test_dataset = utilities.TFR_2D_dataset(test_img,
+                dataset_type = 'test',
+                batch_size=100,
+                buffer_size=1000,
+                crop_size=config['input_size'])
 
-    # infere generator type by looking at the file extention
-    if pathlib.Path(image_files[0]).suffix == '.gz':
-        # this model has been trained using a pythorch generator
-        gen_type = 'pytorch_gen'
-    elif pathlib.Path(image_files[0]).suffix == '.tfrecords':
-        # this model has been trained using a tf generator
-        gen_type = 'tf_gen'
+## perform testing for each fold the model was trained on
 
-    # fix name of image_files
-    if len(image_files[0]) > 50:
-        # filenames contain the full path. Change to load the data from the dataset_path
-        image_files = [os.path.join(dataset_path[gen_type], os.path.basename(os.path.dirname(x)),os.path.basename(x)) for x in image_files]
+test_fold_summary = {}
+folds = glob.glob(os.path.join(model_path,"fold_*"))
+
+for f in folds:
+    # load model
+    if os.path.exists(os.path.join(f, 'model.tf')):
+        model = tf.keras.models.load_model(os.path.join(model_path, 'fold_' + str(fold+1), 'model.tf'), compile=False)
     else:
-        if pathlib.Path(image_files[0]).suffix == '.gz':
-            image_files = [os.path.join(dataset_path[gen_type], 'class_'+ x[-8], x) for x in image_files]
-        elif pathlib.Path(image_files[0]).suffix == '.tfrecords':
-            image_files = [os.path.join(dataset_path[gen_type], 'class_'+ x[-11], x) for x in image_files]
+        raise Exception('Model not found')
 
-    # save infomation in dictionary for this model
-    aus = {}
-    aus['model'] = model[m]
-    aus['description'] = model_description[m]
-    aus['test_files'] = image_files
-    aus['num_folds'] = num_folds
-    aus['unique_labels'] = unique_labels
-    aus['gen_type'] = gen_type
+    test_gt, test_prediction, test_time = utilities_models_tf.test(model, test_dataset)
+    test_fold_summary[cv]={
+            'ground_truth':np.argmax(test_gt.numpy(), axis=-1),
+            'prediction':test_prediction.numpy(),
+            'test_time':float(test_time)
+            }
 
-    models.append(aus)
+## save and plot
+from collections import OrderedDict
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+'''
+Saving overall cross validation test results and images:
+- Confisuion matrix
+- ROC curve
+- Precision-Recall curve
 
-# general generator imformation
-seed = 29
-crop_size = (200,200) # (h, w)
-batch_size = 64
+- test summary file with the prediction for every test image (test_summary.txt)
+    Here add also the information needed to re-plot the ROC and PP curves (fpr,
+    tpr, roc_auc, precision and recall - micro and macro average)
+    The test_summary.txt file is a dictionary with the following entries:
+    - model_name: string
+    - labels: list of the true values fot the tested images
+    - fold_test_values: list containing the predictions for every fold (list of lists)
 
-seq = iaa.Sequential([
-    iaa.Resize({'height': crop_size[0], 'width': crop_size[1]})
-], random_order=False) # apply augmenters in random order
+    - test_time: string
+    - test date: string
 
-transformer = transforms.Compose([
-    utilities.ChannelFix(channel_order='last')
-    ])
+    - accuracy: float
 
-## check data coming out of the generators
-importlib.reload(utilities)
-debug = True
-show = True
-model_to_check = 0
+    - false_positive_rate: list containing the fpr for every class (list of lists)
+    - false_positive_rate_micro_avg: list containing the micro average fpr (used for the overall roc plot)
+    - false_positive_rate_macro_avg: list containing the macro average fpr (used for the overall roc plot)
 
-if debug is True:
-    # check what type of generator the model needs and build it
-    if models[model_to_check]['gen_type'] == 'pytorch_gen':
-        # build pytorch generator
-        transformer_d = transforms.Compose([
-            utilities.ChannelFix(channel_order='first')
-            ])
-        test_dataset_debug = utilities.OCTDataset2D_classification(models[model_to_check]['test_files'],
-                    models[model_to_check]['unique_labels'],
-                    transform=transformer_d,
-                    augmentor=seq)
-        test_dataset_debug = DataLoader(test_dataset_debug, batch_size=18,
-                                shuffle=True, num_workers=0, pin_memory=True)
-        sample = next(iter(test_dataset_debug))
+    - true_positive_rate: list containing the tpr for every class (list of lists)
+    - true_positive_rate_micro_avg: list containing the micro average tpr (used for the overall roc plot)
+    - true_positive_rate_macro_avg: list containing the macro average tpr (used for the overall roc plot)
 
-        # show images if needed
-        if show == True:
-            utilities.show_batch_2D(sample)
-    if models[model_to_check]['gen_type'] == 'tf_gen':
-        # build tf generator
-        test_dataset_debug = utilities.TFR_2D_dataset(models[model_to_check]['test_files'],
-                        dataset_type = 'train',
-                        batch_size=18,
-                        buffer_size=1000,
-                        crop_size=(crop_size[0], crop_size[1]))
-        x, y = next(iter(test_dataset_debug))
-        if show == True:
-            sample = (x.numpy(), y.numpy())
-            utilities.show_batch_2D(sample)
+    - precision: list containing the precision values for every class to plot the PP (list of lists)
+    - precision_micro_avg: list of overall micro average of precision
+    - average_precision: average precision value computed using micro average
 
-## 3 - run throught the cross-validation folds and compute predictions for all images
-importlib.reload(utilities)
+    - recall: list containing the recall value for every class to plot the PP (list of lists)
+    - recall_micro_avg: list of overall micro average of recall
 
-# check if test_summary_file is present in the model folder. If not, perform testing
-# else open the file and store it in the prediction_database variable
+    - F1: list of micro and macro average f1-score
+
+Since the full test_summary file is long to open, the scores are also saved in a separate file for easy access
+scores_test_summary.txt
+'''
+# ############# save the information that is already available
+test_summary = OrderedDict()
+
+test_summary['model_name'] = config['model_save_name']
+test_summary['labels'] = [int(i) for i in test_fold_summary[0]['ground_truth']]
+test_summary['folds_test_logits_values'] = [test_fold_summary[cv]['prediction'].tolist() for cv in range(config['N_FOLDS'])]
+test_summary['test_time'] = utilities.tictoc_from_time(np.sum([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])]))
+test_summary['test_date'] = time.strftime("%Y%m%d-%H%M%S")
+
+# ############ plot and save confucion matrix
+ensemble_pred_argmax = []
+ensemble_pred_logits = []
+# compute ensemble
+# compute the logits mean along the folds
+ensemble_pred_logits = np.array(test_summary['folds_test_logits_values']).mean(axis=0)
+# compute argmax prediction
+ensemble_pred_argmax = np.argmax(ensemble_pred_logits, axis=1)
+
+acc = utilities.plotConfusionMatrix(test_summary['labels'], ensemble_pred_argmax, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
+
+# ############ plot and save ROC curve
+fpr, tpr, roc_auc = utilities.plotROC(test_summary['labels'], ensemble_pred_logits, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
+# make elements of the dictionary to be lists for saving
+for key, value in fpr.items():
+    fpr[key]=value.tolist()
+for key, value in tpr.items():
+    tpr[key]=value.tolist()
+for key, value in roc_auc.items():
+    roc_auc[key]=value.tolist()
+
+# ############ plot and save ROC curve
+precision, recall, average_precision, F1 = utilities.plotPR(test_summary['labels'], ensemble_pred_logits, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
+# make elements of the dictionary to be lists for saving
+for key, value in precision.items():
+    precision[key]=value.tolist()
+for key, value in recall.items():
+    recall[key]=value.tolist()
+
+# save all the information in the test summary
+test_summary['accuracy'] = acc
+
+# test_summary['false_positive_rate'] = [fpr[i].tolist() for i in range(len(class_labels))]
+test_summary['false_positive_rate'] = fpr
+# test_summary['false_positive_rate_micro_avg'] = fpr['micro'].tolist()
+# test_summary['false_positive_rate_macro_avg'] = fpr['macro'].tolist()
+
+test_summary['true_positive_rate'] = tpr
+# test_summary['true_positive_rate'] = [tpr[i].tolist() for i in range(len(class_labels))]
+# test_summary['true_positive_rate_micro_avg'] = tpr['micro'].tolist()
+# test_summary['true_positive_rate_macro_avg'] = tpr['macro'].tolist()
+
+test_summary['precision'] = precision
+# test_summary['precision'] = [precision[i].tolist() for i in range(len(class_labels))]
+# test_summary['precision_micro_avg'] = precision['micro'].tolist()
+
+test_summary['recall'] = recall
+# test_summary['recall'] = [recall[i].tolist() for i in range(len(class_labels))]
+# test_summary['recall_micro_avg'] = recall['micro'].tolist()
+
+test_summary['average_precision'] = average_precision
+test_summary['F1'] = F1
+
+# save summary file
+with open(os.path.join(config['save_model_path'],'test_summary.txt'), 'w') as fp:
+    json.dump(test_summary, fp)
+
+## save summary (can be improved, but using the routine from print_model_performance)
+
+labels = np.eye(np.unique(test_summary['labels']).shape[0])[test_summary['labels']]
+pred_logits = test_summary['folds_test_logits_values']
+
+# check if we are working on a binary or multi-class classification
+binary_classification = True
+if labels.shape[-1] > 2:
+    binary_classification = False
 
 '''
-VERY IMPORTANT!
-During testing, is important that all the folds test on the same images and images
-should be alligned - by using shuffle, the iterator will produce a new sequence
-of images for every fold. This does not allow for the folds to be ensambled
-since, even if each fold is tested on the same images, these are not in the same order.
+For binary classification we can compute all the metrics:
+- Specificity
+- Precision
+- Recall (Sensitivity)
+- F1-score
+- AUC for ROC
+
+For multi-class classification we can only compute:
+- Precision
+- Recall (Sensitivity)
+- F1-score
+- AUC for ROC
 '''
+# Computupe per fold performance
+performance_fold = {
+            'ROC_AUC':[],
+            'Precision': [],
+            'Recall':[],
+            'F1':[]
+                }
+if binary_classification:
+    performance_fold['Specificity'] = []
 
-# where to save all the predictions: model, fold, predictions
-prediction_database = []
+for f in range(n_folds):
+    performance_fold["Precision"].append(average_precision_score(labels, pred_logits[f],
+                                                    average="macro"))
+    performance_fold["Recall"].append(recall_score(np.argmax(labels,-1), np.argmax(pred_logits[f],-1),
+                                                    average="macro"))
+    performance_fold['ROC_AUC'].append(roc_auc_score(labels, pred_logits[f], multi_class='ovr', average='macro'))
+    performance_fold['F1'].append(f1_score(np.argmax(labels,-1), np.argmax(pred_logits[f],-1), average='macro'))
 
-for m in range(len(models)):
-    print('Working on model {}'.format(models[m]['model']))
-    prediction_database.append([])
-    tic = time.time()
+    if binary_classification:
+        tn, fp, fn, tp = confusion_matrix(np.argmax(labels,-1), np.argmax(pred_logits[f], -1)).ravel()
+        performance_fold['Specificity'].append(tn / (tn + fp))
 
-    # check if test_summary.txt file exists in the model folder
-    if os.path.isfile(os.path.join(base_folder, models[m]['model'], 'test_summary.txt')):
-        print(' - test_summary file found. Using data from previous testing.')
-        # open the test_summary file and store information in the predicted_database variable
-        with open(os.path.join(base_folder, models[m]['model'], 'test_summary.txt')) as json_file:
-            data = json.load(json_file)
-            try:
-                folds_test_values = data['folds_test_values']
-            except:
-                folds_test_values = data['folds_test_logits_values']
-            gt = data['labels']
-            test_time = data['test_time']
-            # save in predicted dataset variable
-            # prediction_database[m].append(folds_test_values)
-            prediction_database[m] = folds_test_values
+# compute ensamble performance
+# compute the logits mean along the folds
+ensemble_pred_logits = np.array(pred_logits).mean(axis=0)
+# compute argmax prediction
+ensemble_pred_argmax = np.argmax(ensemble_pred_logits, axis=1)
 
-        print(' - classification of {} images took {} for this model'.format(len(folds_test_values[0]), test_time))
-    else:
-        print('test_summary file not found. Running test now...')
-        # aus_prediction_database = []
-        #
-        # # create generator based on model specifications
-        # if models[m]['gen_type'] == 'pytorch_gen':
-        #     test_dataset = utilities.OCTDataset2D_classification(models[m]['test_files'],
-        #             models[m]['unique_labels'],
-        #             transform=transformer,
-        #             augmentor=seq)
-        #     test_dataset = DataLoader(test_dataset, batch_size=batch_size,
-        #                             shuffle=False, num_workers=0, pin_memory=True)
-        # elif models[m]['gen_type'] == 'tf_gen':
-        #     test_dataset = utilities.TFR_2D_dataset(models[m]['test_files'],
-        #                     dataset_type = 'test',
-        #                     batch_size=batch_size,
-        #                     buffer_size=1000,
-        #                     crop_size=(crop_size[0], crop_size[1]))
-        #
-        # for cv in range(models[m]['num_folds']):
-        #     print(' - runing predictions on fold {}/{}'.format(cv+1, num_folds))
-        #     # load model
-        #     model_path = os.path.join(base_folder, models[m]['model'], 'fold_'+ str(cv+1), 'model')
-        #     if os.path.exists(model_path + '.h5'):
-        #         model_path = model_path + '.h5'
-        #     elif os.path.exists(model_path + '.tf'):
-        #         model_path = model_path + '.tf'
-        #     else:
-        #         raise Exception('Model not found')
-        #
-        #     model = load_model(model_path, compile=False)
-        #     # run through all the images in the test dataset
-        #     aus_pred = []
-        #     aus_gt = []
-        #     for im, label in test_dataset:
-        #         im = im.numpy()
-        #         pred = model(im)
-        #         if type(pred) is list:
-        #             # the model is a VEA, taking only the prediction
-        #             pred = pred[4].numpy().tolist()
-        #         else:
-        #             pred = pred.numpy().tolist()
-        #
-        #         if models[m]['gen_type'] == 'tf_gen':
-        #             # need to fix the labels here based on the unique label information
-        #             label = utilities.fix_labels(label.numpy(),
-        #                                     models[m]['unique_labels'],
-        #                                     categorical=False)
-        #
-        #         aus_pred.extend(pred)
-        #         aus_gt.extend(label)
-        #     # save predictions and gts
-        #     prediction_database[m].append(np.array(aus_pred))
-        #     aus_prediction_database.append(aus_pred)
-        #
-        #     if m == 0:
-        #         gt = np.array(aus_gt)
-        # # print classification time for the model
-        # toc = time.time()
-        # print(' - classification of {} images took {} for this model'.format(len(image_files), utilities.tictoc(tic,toc)))
-        #
-        # # save test summary
-        # print(' - Saving test summary...')
-        #
-        # json_dict = OrderedDict()
-        # json_dict['model_name'] = models[m]['model']
-        # json_dict['labels'] = [int(i) for i in aus_gt]
-        # json_dict['folds_test_values'] = aus_prediction_database
-        # json_dict['test_time'] = utilities.tictoc(tic,toc)
-        # json_dict['test_date'] = time.strftime("%Y%m%d-%H%M%S")
-        # with open(os.path.join(base_folder, models[m]['model'],'test_summary.txt'), 'w') as fp:
-        #     json.dump(json_dict, fp)
-        #
-        # # delete some variables
-        # del test_dataset
-        # del model
+performance_ensamble = {}
 
-gt_backup = gt
+performance_ensamble["Precision"] = average_precision_score(labels, ensemble_pred_logits,
+                                                average="macro")
+performance_ensamble["Recall"] = recall_score(np.argmax(labels,-1), ensemble_pred_argmax,
+                                                average="macro")
+performance_ensamble['ROC_AUC'] = roc_auc_score(labels, ensemble_pred_logits, multi_class='ovr', average='macro')
+performance_ensamble['F1'] = f1_score(np.argmax(labels,-1), ensemble_pred_argmax, average='macro')
+
+if binary_classification:
+    tn, fp, fn, tp = confusion_matrix(np.argmax(labels,-1), ensemble_pred_argmax).ravel()
+    performance_ensamble['Specificity'] = tn / (tn + fp)
+
+# ######################### printing on file
+
+summary = open(os.path.join(model_path,"short_test_summary.txt"), 'w')
+
+summary.write(f'\nModel Name: {os.path.basename(model_path)}\n')
+# add test time overall and per image
+average_test_time = utilities.tictoc_from_time(np.mean([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])]))
+average_test_time_per_image = eaverate_test_time/labels.shape[0]
+summary.write(f'Overall model test time (average over folds): {utilities.tictoc_from_time(average_test_time)}')
+summary.write(f'Average test time per image (average over folds): {utilities.tictoc_from_time(average_test_time_per_image)}\n')
+summary.write(f'{"¤"*21}')
+summary.write(f'¤ Per-fold metrics ¤')
+summary.write(f'{"¤"*21}\n')
+
+if binary_classification:
+    keys = ['Specificity','Recall','Precision', 'F1', 'ROC_AUC']
+
+    summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}')
+
+    for i in range(n_folds):
+        summary.write(f'{i+1:^7}{performance_fold[keys[0]][i]:^11.3f}{performance_fold[keys[1]][i]:^11.3f}{performance_fold[keys[2]][i]:^11.3f}{performance_fold[keys[3]][i]:^11.3f}{performance_fold[keys[-1]][i]:^11.3f}')
+    summary.write(f'{"-"*60}')
+    summary.write(f'{"Average":^7}{np.mean(performance_fold[keys[0]]):^11.3f}{np.mean(performance_fold[keys[1]]):^11.3f}{np.mean(performance_fold[keys[2]]):^11.3f}{np.mean(performance_fold[keys[3]]):^11.3f}{np.mean(performance_fold[keys[4]]):^11.3f}')
+    summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}{np.std(performance_fold[keys[4]]):^11.3f}')
+
+else:
+    keys = ['Recall','Precision', 'F1', 'ROC_AUC']
+
+    summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}')
+
+    for i in range(n_folds):
+        summary.write(f'{i+1:^7}{performance_fold[keys[0]][i]:^11.3f}{performance_fold[keys[1]][i]:^11.3f}{performance_fold[keys[2]][i]:^11.3f}{performance_fold[keys[3]][i]:^11.3f}')
+    summary.write(f'{"-"*50}')
+    summary.write(f'{"Average":^7}{np.mean(performance_fold[keys[0]]):^11.3f}{np.mean(performance_fold[keys[1]]):^11.3f}{np.mean(performance_fold[keys[2]]):^11.3f}{np.mean(performance_fold[keys[3]]):^11.3f}')
+    summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}')
+
+
+summary.write(f'\n{"¤"*20}')
+summary.write(f'¤ Ensamble metrics ¤')
+summary.write(f'{"¤"*20}\n')
+
+if binary_classification:
+    keys = ['Specificity','Recall','Precision', 'F1', 'ROC_AUC']
+    summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}')
+    summary.write(f'{"-"*53}')
+    summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}{performance_ensamble[keys[4]]:^11.3f}')
+else:
+    keys = ['Recall','Precision', 'F1', 'ROC_AUC']
+    summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}')
+    summary.write(f'{"-"*44}')
+    summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}')
+
+summary.close()
+
+
+###
+
+
+
 
 ## 4 - plot and save confusion matrix
 importlib.reload(utilities)
