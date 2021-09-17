@@ -298,6 +298,8 @@ class M4(object):
     '''
     def __init__(self, number_of_input_channels,
                     num_classes,
+                    normalization='BatchNorm',
+                    dropout_rate=0.2,
                     data_augmentation=True,
                     class_weights=None,
                     kernel_size=(5,5),
@@ -318,7 +320,10 @@ class M4(object):
         inputs = Input(shape=[None, None, self.number_of_input_channels])
 
         # save augmented image to compute reconstruction
-        x = utilities_models_tf.augmentor(inputs)
+        if data_augmentation:
+            x = utilities_models_tf.augmentor(inputs)
+        else:
+            x = inputs
 
         # build encoder with ResNet-like bloks
         def Encoder_conv_block(inputs, n_filters):
@@ -338,7 +343,12 @@ class M4(object):
             # conbine the information af all filters together
             x = Conv2D(filters=n_filters,kernel_size=(1,1),padding='same')(x)
             # normalization
-            x = tfa.layers.GroupNormalization(groups=int(n_filters/4))(x)
+            if normalization == 'BatchNorm':
+                x = BatchNormalization()(x)
+            elif normalization == 'GroupNorm':
+                x = tfa.layers.GroupNormalization(groups=int(n_filters/4))(x)
+            else:
+                raise ValueError(f'Not recognized normalization type. Expecting BatchNorm or GroupNorm but given {normalization}')
             # through the activation
             return tf.keras.layers.LeakyReLU()(x)
 
@@ -352,17 +362,18 @@ class M4(object):
 
         # bottle-neck
         x = Conv2D(filters=128, kernel_size=self.kernel_size, padding='same')(x)
+        x = BatchNormalization()(x)
         x = Conv2D(filters=128, kernel_size=self.kernel_size, padding='same')(x)
-        x = tfa.layers.GroupNormalization(groups=int(128/4))(x)
+        # x = tfa.layers.GroupNormalization(groups=int(128/4))(x)
         x = tf.keras.layers.LeakyReLU()(x)
 
         # encoding vector
         encoding_vector = GlobalMaxPooling2D()(x)
 
         # FCN
-        pred = Dropout(rate=0.2)(encoding_vector)
+        pred = Dropout(rate=dropout_rate)(encoding_vector)
         pred = Dense(units=60, activation='relu')(pred)
-        pred = Dropout(rate=0.2)(pred)
+        pred = Dropout(rate=dropout_rate)(pred)
         pred = Dense(units=self.num_classes)(pred)
 
         self.model = Model(inputs=inputs, outputs=pred, name=model_name)
@@ -372,6 +383,8 @@ class M4(object):
         self.depth = 3
         self.num_filter_per_layer = [16, 32, 64]
         self.custom_model = False
+        self.dropout_rate=dropout_rate
+        self.normalization=normalization
 
         # print model if needed
         if self.debug is True:
