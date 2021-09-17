@@ -412,8 +412,17 @@ def plotROC(GT, PRED, classes, savePath=None, draw=False):
                 ''.format(classes[i], roc_auc[i]))
 
     ax.plot([0, 1], [0, 1], 'k--', lw=lw)
+
+    major_ticks = np.arange(0, 1, 0.1)
+    minor_ticks = np.arange(0, 1, 0.05)
+    ax.set_xticks(major_ticks)
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_yticks(major_ticks)
+    ax.set_yticks(minor_ticks, minor=True)
     ax.set_xlim([0.0, 1.0])
     ax.set_ylim([0.0, 1.0])
+    plt.grid(color='b', linestyle='-.', linewidth=0.1, which='both')
+
     ax.set_xlabel('False Positive Rate', fontsize=25)
     ax.set_ylabel('True Positive Rate', fontsize=25)
     ax.set_title('Multi-class ROC (OneVsAll)', fontsize=20)
@@ -442,6 +451,7 @@ def plotROC(GT, PRED, classes, savePath=None, draw=False):
         x1, x2, y1, y2 = 0.0, 0.3, 0.7, 1.0
         axins.set_xlim(x1, x2)
         axins.set_ylim(y1, y2)
+        axins.grid(color='b', linestyle='--', linewidth=0.1)
 
         axins.set_xticks(np.linspace(x1, x2, 4))
         axins.set_yticks(np.linspace(y1, y2, 4))
