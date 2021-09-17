@@ -639,6 +639,7 @@ def show_batch_2D_with_histogram(sample_batched, title=None):
         number of images per row in the created grid of images.
     """
     n_images_to_show = 5
+    random.seed(29092019)
     index_samples = random.sample(range(len(sample_batched[0])), n_images_to_show)
 
     # make figure grid
