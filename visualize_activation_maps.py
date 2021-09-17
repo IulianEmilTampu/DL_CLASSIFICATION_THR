@@ -49,7 +49,7 @@ args = vars(ap.parse_args())
 
 
 ## 1 load folders and information about the model
-model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/M4_c4_withMoreAugmentation'
+model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/M4_c1_Range_constantLr_001'
 save_path = os.path.join(model_path, 'Gard-Cam')
 # check if save_path exists if not, create it
 if not os.path.isdir(save_path):
@@ -96,7 +96,7 @@ importlib.reload(utilities_models_tf)
 
 seed = 29122009
 batch_size = 200
-images_to_show = 2000
+images_to_show = 1000
 
 # check data coming out of the generators
 debug = True

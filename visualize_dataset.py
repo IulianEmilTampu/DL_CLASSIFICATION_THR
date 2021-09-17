@@ -32,7 +32,7 @@ import utilities_models_tf
 from_configuration_file = True
 
 if from_configuration_file:
-    model_name = 'M4_c4_withMoreAugmentation'
+    model_name = 'M4_c6_BatchNorm_dr0.2_lr0.2_wcce_weights'
     trained_models_path = '/flush/iulta54/Research/P3-THR_DL/trained_models'
     dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/'
 
@@ -56,46 +56,68 @@ else:
     val_img = []
     crop_size = []
 
-examples_to_show = 50
+examples_to_show = 80
 
 ## 2 create dataset and augmentation layer
 importlib.reload(utilities)
 
 # build tf generator
 test_dataloader = utilities.TFR_2D_dataset(test_img,
-                dataset_type = 'test',
+                dataset_type = 'train',
                 batch_size=examples_to_show,
                 buffer_size=5000,
                 crop_size=crop_size)
 
-# # set normalization layer on the training dataset
-# tr_feature_ds = test_dataloader.map(tf.autograph.experimental.do_not_convert(lambda x, y: x))
-# normalizer = layers.experimental.preprocessing.Normalization(axis=-1)
-# normalizer.adapt(tr_feature_ds)
 
-augmentor = tf.keras.Sequential([layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-                layers.experimental.preprocessing.RandomRotation(0.02)],
-            name='NormalizationAugmentationCropping')
-
-## 2 create data augmentation layers
+## 3 take out data
 importlib.reload(utilities)
+importlib.reload(utilities_models_tf)
 
 x, y = next(iter(test_dataloader))
 
-# x = normalizer(x)
-# x = augmentor(x, training=False)
+# augment
+# x = utilities_models_tf.augmentor(x)
+# fix labels
 y = utilities_models_tf.fix_labels_v2(y.numpy(), classification_type='c3', unique_labels=config['unique_labels'], categorical=False)
+
 sample = (x.numpy(), y.numpy())
 
 print(f'{"Mean:":5s}{x.numpy().mean():0.2f}')
 print(f'{"STD:":5s}{x.numpy().std():0.2f}')
 
-utilities.show_batch_2D(sample, img_per_row=10)
+utilities.show_batch_2D(sample, img_per_row=10, title='Without augmentation')
 
-## show examples with histogram
+# show examples with histogram
+
+utilities.show_batch_2D_with_histogram(sample, title='Without augmentation')
+
+## 4 apply augmentation (check histograms)
 importlib.reload(utilities)
+importlib.reload(utilities_models_tf)
 
-utilities.show_batch_2D_with_histogram(sample)
+# create agumentation layer
+def augmentor(inputs):
+    aug = tf.keras.Sequential([
+            layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+            layers.experimental.preprocessing.RandomRotation(0.02)],
+            name='Augmentation')
+    return aug(inputs)
+# augment
+
+# layers.experimental.preprocessing.RandomContrast(factor=0.8)
+
+x = augmentor(x)
+
+sample = (x.numpy(), y.numpy())
+
+print(f'{"Mean:":5s}{x.numpy().mean():0.2f}')
+print(f'{"STD:":5s}{x.numpy().std():0.2f}')
+
+utilities.show_batch_2D(sample, img_per_row=10, title='With augmentation')
+
+# show examples with histogram
+
+utilities.show_batch_2D_with_histogram(sample, title='With augmentation')
 
 
 
