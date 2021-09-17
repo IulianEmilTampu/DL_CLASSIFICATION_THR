@@ -48,6 +48,8 @@ parser.add_argument('-wd','--working_directory' ,required=False, help='Provide t
 parser.add_argument('-df', '--dataset_folder', required=True, help='Provide the Dataset Folder where the Train and Test folders are present along with the dataset information file.')
 parser.add_argument('-tts', '--train_test_split', required=False, help='Provide the path to the train_test_split.json file specifying the test and training dataset.', default=None)
 parser.add_argument('-mc', '--model_configuration', required=False, help='Provide the Model Configuration (LightOCT, M2, M3, ResNet50, VAE or others if implemented in the models_tf.py file).', default='LightOCT')
+parser.add_argument('-norm', '--model_normalization', required=False, help='Provide what type of normalization to use inside the model (BatchNorm or GroupNorm).', default='BatchNorm')
+parser.add_argument('-dr', '--dropout_rate', required=False, help='Provide the dropout rate.', default=0.2)
 parser.add_argument('-mn', '--model_name', required=False, help='Provide the Model Name. This will be used to create the folder where to save the model. If not provided, the current datetime will be used', default=datetime.now().strftime("%H:%M:%S"))
 parser.add_argument('-ct', '--classification_type', required=False, help='Provide the Classification Type. Chose between 1 (normal-vs-disease), 2 (normal-vs-enlarged-vs-shrinked) and 3 (normal-vs-all_diseases_available). If not provided, normal-vs-disease will be used.', default='c1')
 parser.add_argument('-cct', '--custom_classification_type', required=False, help='If the classification type is custom (not one of the dfefault one). If true, training test split will be generated here instead of using the already available one in the dataset folder. Note that all the custom classification arte based on the per-disease class split.', default=False)
@@ -71,6 +73,8 @@ working_folder = args.working_directory
 dataset_folder = args.dataset_folder
 train_test_split = args.train_test_split
 model_configuration = args.model_configuration
+model_normalization = args.model_normalization
+dropout_rate = float(args.dropout_rate)
 model_save_name = args.model_name
 classification_type = args.classification_type
 custom_classification = args.custom_classification_type == 'True'
@@ -202,7 +206,7 @@ classification_type_dict['c5']['class_labels'] = ['normal', 'enlarged']
 
 # enlarged vs shrunk-depleted
 classification_type_dict['c6'] = {}
-classification_type_dict['c6']['unique_labels'] = [0,1]
+classification_type_dict['c6']['unique_labels'] = [1, [2, 3, 4, 5]]
 classification_type_dict['c6']['class_labels'] = ['enlarged', 'shrunk-depleted']
 
 # check if we are using a default classification type. If yes, use the train_test_split.json file
@@ -243,12 +247,12 @@ else:
                 train_val_filenames = [os.path.join(dataset_folder, f+extension) for f in train_val_filenames]
                 test_filenames = [os.path.join(dataset_folder, f+extension) for f in test_filenames]
 
-                # debug modeaus = [os.path.basename(i[0:i.find('c1')-1]) for i in c]
-                if debug:
-                    print('Running in debug mode - using less training data (20000) \n')
-                    # random.seed(29)
-                    random.shuffle(train_val_filenames)
-                    train_val_filenames = train_val_filenames[0:20000]
+                # # debug modeaus = [os.path.basename(i[0:i.find('c1')-1]) for i in c]
+                # if debug:
+                #     print('Running in debug mode - using less training data (20000) \n')
+                #     # random.seed(29)
+                #     random.shuffle(train_val_filenames)
+                #     train_val_filenames = train_val_filenames[0:20000]
         else:
             raise ValueError(f'Using default classification type, but not train_test_split.json file found. Run the set_test_set.py first')
     else:
@@ -317,6 +321,12 @@ if custom_classification:
 
 ## compute class weights on the training dataset and apply imbalance data strategy
 
+if debug:
+    print('Running in debug mode - using less training/validation data (20000) \n')
+    # random.seed(29)
+    random.shuffle(train_val_filenames)
+    train_val_filenames = train_val_filenames[0:20000]
+
 train_val_filenames, train_val_labels, per_class_file_names = utilities.get_organized_files(train_val_filenames,
                     classification_type=classification_type,
                     custom= not (classification_type == 'c1' or classification_type == 'c2' or classification_type == 'c3'),
@@ -366,23 +376,27 @@ elif imbalance_data_strategy == 'weights':
     # class_weights = class_weights / class_weights.sum()
     loss = 'wcce'
 
+elif imbalance_data_strategy == 'none':
+    print(f'\nUsing {imbalance_data_strategy} strategy to handle imbalance data.')
+    print(f'Setting loss function to {loss}.')
+    class_weights = np.ones(len(per_class_file_names))
+
 n_train = len(train_val_filenames)
 n_test = len(test_filenames)
 
-# ############## check that no testing files are in the training validation pool
-#
-print('Checking if any test samples are in the training - validation pool (this may take time...)')
-duplicated = []
-for idx, ts in enumerate(test_filenames):
-    print(f'Checked {idx+1}/{len(test_filenames)} \r', end='')
-    for tr in train_val_filenames:
-        if os.path.basename(ts) == os.path.basename(tr):
-            duplicated.append(ts)
-            raise ValueError(f'Some of the testing files are in the trianing - validation pool ({len(duplicated)} out of {len(test_filenames)}). CHECK IMPLEMENTATION!!!')
+# # ############## check that no testing files are in the training validation pool
+# #
+# print('Checking if any test samples are in the training - validation pool (this may take time...)')
+# duplicated = []
+# for idx, ts in enumerate(test_filenames):
+#     print(f'Checked {idx+1}/{len(test_filenames)} \r', end='')
+#     for tr in train_val_filenames:
+#         if os.path.basename(ts) == os.path.basename(tr):
+#             duplicated.append(ts)
+#             raise ValueError(f'Some of the testing files are in the trianing - validation pool ({len(duplicated)} out of {len(test_filenames)}). CHECK IMPLEMENTATION!!!')
+# print('No testing files found in the training - validation pool. All good!!!')
 
-print('No testing files found in the training - validation pool. All good!!!')
-
-print(f'\nWill train and validate on {n_train} images (some might have been removed since not classifiebly in this task)')
+print(f'\nWill train and validate on {n_train} images (some might have been removed since not classifiable in this task)')
 print(f'Will test on {n_test} images ({n_images_per_class} for each class)')
 print(f'{"Class weights":<10s}: {class_weights}')
 
@@ -408,8 +422,6 @@ for c in per_class_file_names:
 # for i, c in enumerate(classification_type_dict[classification_type]['unique_labels']):
 #     for v in per_class_unique_volumes[i]:
 #         print(v)
-
-N_FOLDS = 1
 
 # 2
 if N_FOLDS >= 2:
@@ -517,6 +529,8 @@ json_dict['unique_labels'] = classification_type_dict[classification_type]['uniq
 json_dict['label_description'] =classification_type_dict[classification_type]['class_labels']
 
 json_dict['model_configuration'] = model_configuration
+json_dict['dropout_rate'] = dropout_rate
+json_dict['model_normalization'] = model_normalization
 json_dict['model_save_name'] = model_save_name
 json_dict['loss'] = loss
 json_dict['learning_rate'] = learning_rate
