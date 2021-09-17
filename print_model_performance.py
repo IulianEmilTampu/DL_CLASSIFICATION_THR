@@ -41,7 +41,7 @@ from sklearn.metrics import average_precision_score, recall_score, roc_auc_score
 parser = argparse.ArgumentParser(description='Script that prints a summary of the model perfomance.')
 parser.add_argument('-m','--model' ,required=True, help='Specify the folder where the trained and tested model is located')
 parser.add_argument('-p','--plot' ,required=False, help='Specify if replotting and saving Confusion matrix, ROC and PP', default=False)
-parser.add_argument('-ul','--unique_labels',nargs='+' ,required=False, help='Specify Specify labels to be used in the plot.', default=[])
+parser.add_argument('-ul','--unique_labels',nargs='+' ,required=False, help='Specify labels to be used in the plot.', default=[])
 args = parser.parse_args()
 
 model_path = args.model
