@@ -142,6 +142,8 @@ for cv in range(config['N_FOLDS']):
     elif config['model_configuration'] == 'M4':
         model = models_tf.M4(number_of_input_channels = 1,
                         model_name=config['model_configuration'],
+                        normalization = config['model_normalization'],
+                        dropout_rate = config['dropout_rate'],
                         num_classes = len(config['unique_labels']),
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
@@ -220,6 +222,9 @@ for cv in range(config['N_FOLDS']):
 
     # train model
     print(' - Training fold...')
+    warm_up = True,
+    warm_up_epochs = 5
+    warm_up_learning_rate = 0.00001
     if debug is True:
         if 'VAE' in config['model_configuration']:
             print('TRAINING VAE')
@@ -236,6 +241,9 @@ for cv in range(config['N_FOLDS']):
                             max_epochs=3,
                             early_stopping=True,
                             patience=10,
+                            warm_up = warm_up,
+                            warm_up_epochs = warm_up_epochs,
+                            warm_up_learning_rate = warm_up_learning_rate,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             verbose=config['verbose']
@@ -252,6 +260,9 @@ for cv in range(config['N_FOLDS']):
                             max_epochs=3,
                             early_stopping=True,
                             patience=10,
+                            warm_up = warm_up,
+                            warm_up_epochs = warm_up_epochs,
+                            warm_up_learning_rate = warm_up_learning_rate,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             verbose=config['verbose']
@@ -264,46 +275,37 @@ for cv in range(config['N_FOLDS']):
                             unique_labels = config['unique_labels'],
                             loss=[config['loss']],
                             start_learning_rate = config['learning_rate'],
-                            scheduler = 'polynomial',
+                            scheduler = 'linear',
                             vae_kl_weight=config['vae_kl_weight'],
                             vae_reconst_weight=config['vae_reconst_weight'],
                             power = 0.1,
                             max_epochs=500,
                             early_stopping=True,
-                            patience=10,
+                            patience=20,
+                            warm_up = warm_up,
+                            warm_up_epochs = warm_up_epochs,
+                            warm_up_learning_rate = warm_up_learning_rate,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             verbose=config['verbose']
                             )
         else:
-            # utilities_models_tf.train(model,
-            #                 train_dataset, val_dataset,
-            #                 classification_type =config['classification_type'],
-            #                 unique_labels = config['unique_labels'],
-            #                 loss=[config['loss']],
-            #                 start_learning_rate = config['learning_rate'],
-            #                 scheduler = 'polynomial',
-            #                 power = 0.1,
-            #                 max_epochs=500,
-            #                 early_stopping=True,
-            #                 patience=25,
-            #                 save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
-            #                 save_model_architecture_figure=True if cv==0 else False,
-            #                 verbose=config['verbose']
-            #                 )
-            utilities_models_tf.train_lookaheadOPT(model,
+            utilities_models_tf.train(model,
                             train_dataset, val_dataset,
                             classification_type =config['classification_type'],
                             unique_labels = config['unique_labels'],
                             loss=[config['loss']],
                             start_learning_rate = config['learning_rate'],
-                            scheduler = 'polynomial',
+                            scheduler = 'linear',
                             power = 0.1,
                             max_epochs=500,
                             early_stopping=True,
-                            patience=10,
+                            patience=20,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
+                            warm_up = warm_up,
+                            warm_up_epochs = warm_up_epochs,
+                            warm_up_learning_rate = warm_up_learning_rate,
                             verbose=config['verbose']
                             )
 
