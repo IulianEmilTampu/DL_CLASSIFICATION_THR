@@ -24,23 +24,37 @@ import importlib
 import numpy as np
 from itertools import cycle
 from datetime import datetime
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 from sklearn.metrics import average_precision_score, recall_score, roc_auc_score, f1_score, confusion_matrix, auc
 
 ## 1 - get model path and check that everything is in place
 
-parser = argparse.ArgumentParser(description='Script that compares models ROC and training curves.')
-parser.add_argument('-m','--models' ,required=True, help='List of model names that should be compared.')
-parser.add_argument('-tmp','--trained_model_path' ,required=True, help='Path of where the trained models are located.', default=False)
-args = parser.parse_args()
+# parser = argparse.ArgumentParser(description='Script that compares models ROC and training curves.')
+# parser.add_argument('-m','--models' ,required=True, help='List of model names that should be compared.')
+# parser.add_argument('-tmp','--trained_model_path' ,required=True, help='Path of where the trained models are located.', default=False)
+# args = parser.parse_args()
+#
+# model_path = args.model
+# trained_model_path = args.trained_model_path
+# models = [str(i) for i in args.models]
 
-model_path = args.model
-trained_model_path = args.trained_model_path
-models = [str(i) for i in args.models]
+# ############ for debug
+wcce = "none"
+lr = 0.0001
+dr = 0.2
+trained_model_path = "/flush/iulta54/Research/P3-THR_DL/trained_models"
+models = [f"M4_c6_BatchNorm_dr{dr}_lr{lr}_wcce_{wcce}_batch16",
+          f"M4_c6_BatchNorm_dr{dr}_lr{lr}_wcce_{wcce}_batch64",
+          f"M4_c6_BatchNorm_dr{dr}_lr{lr}_wcce_{wcce}_batch128"]
 
-# # ############ for debug
-# trained_model_path = "/flush/iulta54/Research/P3-THR_DL/trained_models"
-# models = ["LigthOCT_c1_anisotropic_woa", "LigthOCT_c1_isotropic_wa", "LigthOCT_c1_isotropic_woa", "M4_c4_withMoreAugmentation"]
+# models = ["M4_c6_BatchNorm_dr0.2_lr0.001_wcce_none_batch16",
+#           "M4_c6_BatchNorm_dr0.2_lr0.005_wcce_none_batch128",
+#           "M4_c6_BatchNorm_dr0.2_lr0.0005_wcce_weights_batch128",
+#           "M4_c6_BatchNorm_dr0.2_lr0.0001_wcce_none_batch64",
+#           "M4_c6_BatchNorm_dr0.2_lr0.001_wcce_weights_batch64"]
 
 # Check that model folder exists and that the test_summary.txt file is present
 for m in models:
@@ -51,10 +65,12 @@ for m in models:
         if not os.path.isfile(os.path.join(trained_model_path, m, "test_summary.txt")):
             raise ValueError(f'The test_summary.txt file is not present in the model path. Run test first. Given {os.path.join(trained_model_path, m, "test_summary.txt")}')
 
-## get the true positive and false positive rates for all the models
+# get the true positive and false positive rates for all the models
 fpr = dict()
 tpr = dict()
 roc_auc = dict()
+acc = dict()
+f1 = dict()
 
 for m in models:
     # load the test_summary.txt file and get information
@@ -69,23 +85,28 @@ for m in models:
             roc_auc[m] = dict()
             roc_auc[m]['micro'] = auc(fpr[m]["micro"], tpr[m]["micro"])
             roc_auc[m]['macro'] = auc(fpr[m]["macro"], tpr[m]["macro"])
+        # save also acc and f1 acores
+        acc[m] = test_summary["accuracy"]
+        f1[m]= {"macro" : test_summary["F1"]["macro"],
+                "micro" : test_summary["F1"]["micro"]}
 
-## plot the comparicon ROC between models (micro and macro average separately)
+# plot the comparicon ROC between models (micro and macro average separately)
 
 # overall settings
 tick_font_size=20
 title_font_size=20
 label_font_size=25
-legend_font_size=16
+legend_font_size=8
 line_width=2
-save = True
+save = False
+mml = np.max([len(i) for i in models])
 
 # ########## MACRO AVERAGE
 fig, ax = plt.subplots(figsize=(10,10))
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
 for m, color in zip(models, colors):
     ax.plot(fpr[m]['macro'], tpr[m]['macro'], color=color, lw=line_width,
-            label=f"{m}")
+            label=f'{m:{mml+2}s}(AUC:{roc_auc[m]["macro"]:0.3f}, F1:{f1[m]["macro"]:0.3f}, ACC:{acc[m]}')
 
 ax.plot([0, 1], [0, 1], 'k--', lw=line_width)
 major_ticks = np.arange(0, 1, 0.1)
@@ -136,7 +157,7 @@ fig, ax = plt.subplots(figsize=(10,10))
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
 for m, color in zip(models, colors):
     ax.plot(fpr[m]['micro'], tpr[m]['micro'], color=color, lw=line_width,
-            label=f"{m}")
+            label=f'{m:{mml+2}s}(AUC:{roc_auc[m]["micro"]:0.3f}, F1:{f1[m]["micro"]:0.3f}, ACC:{acc[m]}')
 
 ax.plot([0, 1], [0, 1], 'k--', lw=line_width)
 major_ticks = np.arange(0, 1.1, 0.1)
@@ -238,7 +259,7 @@ def get_mean_and_std(parameter_dict):
 tick_font_size=20
 title_font_size=16
 label_font_size=12
-legend_font_size=16
+legend_font_size=8
 line_width=2
 alpha_fillin = 0.1
 save = True
@@ -289,7 +310,10 @@ for parameter, y_label in zip(parameters,y_labels):
 
         ax.grid(which="both", color='k', linestyle='--', linewidth=0.1, alpha=0.5)
 
-        ax.legend(loc='upper left')
+        if y_label=='loss':
+            ax.legend(loc='upper right')
+        else:
+            ax.legend(loc='lower right')
 
     # save figure if needed
     if save is True:
@@ -300,9 +324,95 @@ for parameter, y_label in zip(parameters,y_labels):
         plt.show()
 
 
+##
+
+wcce = ["none", "weights"]
+lr = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
+dr = [0.2, 0.3, 0.3]
+batch = [16, 64, 128]
+
+max_acc = [{"model":"", "value" : 0} for i in range(4)]
+
+max_micro_auc = [{"model":"", "value" : 0} for i in range(4)]
+max_macro_auc = [{"model":"", "value" : 0} for i in range(4)]
+
+max_micro_f1 = [{"model":"", "value" : 0} for i in range(4)]
+max_macro_f1 = [{"model":"", "value" : 0} for i in range(4)]
+
+all_acc = []
+all_micro_auc = []
+all_macro_auc = []
+
+all_micro_f1 = []
+all_macro_f1 = []
+
+all_model_names = []
+
+trained_model_path = "/flush/iulta54/Research/P3-THR_DL/trained_models"
+
+for d in dr:
+    for l in lr:
+        for w in wcce:
+            for b in batch:
+                # build model name
+                model = f"M4_c6_BatchNorm_dr{d}_lr{l}_wcce_{w}_batch{b}"
+
+                # check if model exists
+                if os.path.isdir(os.path.join(trained_model_path, model)):
+                    # check that the test_summary.txt file is present
+                    if os.path.isfile(os.path.join(trained_model_path, model, "test_summary.txt")):
+                        # save information
+                        all_model_names.append(model)
+
+                        # open test_summary and save information
+                        with open(os.path.join(trained_model_path, model, 'test_summary.txt')) as file:
+                            test_summary = json.load(file)
+                            # check if roc_auc is saved, if not compute (in older version was not saved)
+                            if "roc_auc" in test_summary:
+                                all_micro_auc.append(test_summary['roc_auc']['micro'])
+                                all_macro_auc.append(test_summary['roc_auc']['macro'])
+
+                                all_micro_f1.append(test_summary['F1']['micro'])
+                                all_macro_f1.append(test_summary['F1']['macro'])
+
+                                all_acc.append(test_summary["accuracy"])
+##
+# get the first 4 best models in the different metrics
+# accuracy
+all_best = {"accuracy":[],
+            "micro_auc":[],
+            "macro_auc":[],
+            "micro_f1":[],
+            "macro_f1":[]}
 
 
+metric = np.array(all_acc)
+indexes = (-metric).argsort()[:4]
+all_best["accuracy"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
 
+metric = np.array(all_macro_auc)
+indexes = (-metric).argsort()[:4]
+all_best["macro_auc"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
+
+metric = np.array(all_micro_auc)
+indexes = (-metric).argsort()[:4]
+all_best["micro_auc"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
+
+metric = np.array(all_macro_f1)
+indexes = (-metric).argsort()[:4]
+all_best["macro_f1"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
+
+metric = np.array(all_micro_f1)
+indexes = (-metric).argsort()[:4]
+all_best["micro_f1"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
+
+# print results
+for metric, values in all_best.items():
+    print(f'{metric.upper()}')
+    print(f'{"-"*10}')
+    for idx, m in enumerate(values):
+        print(f'    {idx} - {m["model"]:56s}: {m["value"]:2.3f}')
+    print(f'{"-"*10}\n')
 
 
 
