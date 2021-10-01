@@ -45,8 +45,22 @@ import utilities
 import utilities_models_tf
 
 ## 1 - get models information and additional files
-model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/LigthOCT_c1_anisotropic_wa'
-dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning'
+parser = argparse.ArgumentParser(description='Script that prints a summary of the model perfomance.')
+parser.add_argument('-m','--model_path' ,required=True, help='Specify the folder where the trained model is located')
+parser.add_argument('-d','--dataset_path' ,required=False, help='Specify where the dataset is located', default=False)
+args = parser.parse_args()
+
+model_path = args.model_path
+dataset_path = args.dataset_path
+
+# # DEBUG
+# model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/M4_c6_BatchNorm_dr0.2_lr0.0005_wcce_weights_batch16_T'
+# dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning'
+
+title="Testing script"
+print(f'\n{"-"*len(title)}')
+print(f'{title}')
+print(f'{"-"*len(title)}\n')
 
 # check forlders
 if not os.path.isdir(model_path):
@@ -55,9 +69,15 @@ else:
     # check that the configuration file is in place
     if not os.path.isfile(os.path.join(model_path,'config.json')):
         raise ValueError(f'Configuration file not found for the given model. Check that the model was configured and trained. Given {os.path.join(model_path,"config.json")}')
+    else:
+        print("Model and config file found.")
 
 if not os.path.isdir(dataset_path):
-    raise ValueError(f'Model not found. Given {dataset_path}')
+    raise ValueError(f'Dataset path not found. Given {dataset_path}')
+else:
+    print('Dataset path found.')
+
+print(f'Working on model {os.path.basename(model_path)}')
 
 ## 2 - load testing dataset
 importlib.reload(utilities)
@@ -78,19 +98,21 @@ test_dataset = utilities.TFR_2D_dataset(test_img,
                 crop_size=config['input_size'])
 
 ## perform testing for each fold the model was trained on
+importlib.reload(utilities_models_tf)
 
 test_fold_summary = {}
 folds = glob.glob(os.path.join(model_path,"fold_*"))
 
-for f in folds:
+for idx, f in enumerate(folds):
+    print(f'Working on fold {idx+1}/{len(folds)}')
     # load model
     if os.path.exists(os.path.join(f, 'model.tf')):
-        model = tf.keras.models.load_model(os.path.join(model_path, 'fold_' + str(fold+1), 'model.tf'), compile=False)
+        model = tf.keras.models.load_model(os.path.join(f, 'model.tf'), compile=False)
     else:
         raise Exception('Model not found')
 
-    test_gt, test_prediction, test_time = utilities_models_tf.test(model, test_dataset)
-    test_fold_summary[cv]={
+    test_gt, test_prediction, test_time = utilities_models_tf.test_independent(model, config, test_dataset)
+    test_fold_summary[idx]={
             'ground_truth':np.argmax(test_gt.numpy(), axis=-1),
             'prediction':test_prediction.numpy(),
             'test_time':float(test_time)
@@ -139,6 +161,7 @@ Saving overall cross validation test results and images:
 Since the full test_summary file is long to open, the scores are also saved in a separate file for easy access
 scores_test_summary.txt
 '''
+print(f'Saving information...')
 # ############# save the information that is already available
 test_summary = OrderedDict()
 
@@ -208,6 +231,9 @@ with open(os.path.join(config['save_model_path'],'test_summary.txt'), 'w') as fp
     json.dump(test_summary, fp)
 
 ## save summary (can be improved, but using the routine from print_model_performance)
+from sklearn.metrics import average_precision_score, recall_score, roc_auc_score, f1_score, confusion_matrix
+
+n_folds = len(folds)
 
 labels = np.eye(np.unique(test_summary['labels']).shape[0])[test_summary['labels']]
 pred_logits = test_summary['folds_test_logits_values']
@@ -241,7 +267,7 @@ performance_fold = {
 if binary_classification:
     performance_fold['Specificity'] = []
 
-for f in range(n_folds):
+for f in range(len(folds)):
     performance_fold["Precision"].append(average_precision_score(labels, pred_logits[f],
                                                     average="macro"))
     performance_fold["Recall"].append(recall_score(np.argmax(labels,-1), np.argmax(pred_logits[f],-1),
@@ -274,14 +300,14 @@ if binary_classification:
 
 # ######################### printing on file
 
-summary = open(os.path.join(model_path,"short_test_summary.txt"), 'w')
+summary = open(os.path.join(config['save_model_path'],"short_test_summary.txt"), 'w')
 
-summary.write(f'\nModel Name: {os.path.basename(model_path)}\n')
+summary.write(f'\nModel Name: {os.path.basename(model_path)}\n\n')
 # add test time overall and per image
-average_test_time = utilities.tictoc_from_time(np.mean([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])]))
-average_test_time_per_image = eaverate_test_time/labels.shape[0]
-summary.write(f'Overall model test time (average over folds): {utilities.tictoc_from_time(average_test_time)}')
-summary.write(f'Average test time per image (average over folds): {utilities.tictoc_from_time(average_test_time_per_image)}\n')
+average_test_time = np.mean([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])])
+average_test_time_per_image = np.mean([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])])/labels.shape[0]
+summary.write(f'Overall model test time (average over folds): {utilities.tictoc_from_time(average_test_time)}\n')
+summary.write(f'Average test time per image (average over folds): {utilities.tictoc_from_time(average_test_time_per_image)}\n\n')
 summary.write(f'{"¤"*21}')
 summary.write(f'¤ Per-fold metrics ¤')
 summary.write(f'{"¤"*21}\n')
@@ -289,24 +315,24 @@ summary.write(f'{"¤"*21}\n')
 if binary_classification:
     keys = ['Specificity','Recall','Precision', 'F1', 'ROC_AUC']
 
-    summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}')
+    summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}\n')
 
     for i in range(n_folds):
-        summary.write(f'{i+1:^7}{performance_fold[keys[0]][i]:^11.3f}{performance_fold[keys[1]][i]:^11.3f}{performance_fold[keys[2]][i]:^11.3f}{performance_fold[keys[3]][i]:^11.3f}{performance_fold[keys[-1]][i]:^11.3f}')
-    summary.write(f'{"-"*60}')
-    summary.write(f'{"Average":^7}{np.mean(performance_fold[keys[0]]):^11.3f}{np.mean(performance_fold[keys[1]]):^11.3f}{np.mean(performance_fold[keys[2]]):^11.3f}{np.mean(performance_fold[keys[3]]):^11.3f}{np.mean(performance_fold[keys[4]]):^11.3f}')
-    summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}{np.std(performance_fold[keys[4]]):^11.3f}')
+        summary.write(f'{i+1:^7}{performance_fold[keys[0]][i]:^11.3f}{performance_fold[keys[1]][i]:^11.3f}{performance_fold[keys[2]][i]:^11.3f}{performance_fold[keys[3]][i]:^11.3f}{performance_fold[keys[-1]][i]:^11.3f}\n')
+    summary.write(f'{"-"*60}\n')
+    summary.write(f'{"Average":^7}{np.mean(performance_fold[keys[0]]):^11.3f}{np.mean(performance_fold[keys[1]]):^11.3f}{np.mean(performance_fold[keys[2]]):^11.3f}{np.mean(performance_fold[keys[3]]):^11.3f}{np.mean(performance_fold[keys[4]]):^11.3f}\n')
+    summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}{np.std(performance_fold[keys[4]]):^11.3f}\n\n')
 
 else:
     keys = ['Recall','Precision', 'F1', 'ROC_AUC']
 
-    summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}')
+    summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}\n')
 
     for i in range(n_folds):
-        summary.write(f'{i+1:^7}{performance_fold[keys[0]][i]:^11.3f}{performance_fold[keys[1]][i]:^11.3f}{performance_fold[keys[2]][i]:^11.3f}{performance_fold[keys[3]][i]:^11.3f}')
-    summary.write(f'{"-"*50}')
-    summary.write(f'{"Average":^7}{np.mean(performance_fold[keys[0]]):^11.3f}{np.mean(performance_fold[keys[1]]):^11.3f}{np.mean(performance_fold[keys[2]]):^11.3f}{np.mean(performance_fold[keys[3]]):^11.3f}')
-    summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}')
+        summary.write(f'{i+1:^7}{performance_fold[keys[0]][i]:^11.3f}{performance_fold[keys[1]][i]:^11.3f}{performance_fold[keys[2]][i]:^11.3f}{performance_fold[keys[3]][i]:^11.3f}\n')
+    summary.write(f'{"-"*50}\n')
+    summary.write(f'{"Average":^7}{np.mean(performance_fold[keys[0]]):^11.3f}{np.mean(performance_fold[keys[1]]):^11.3f}{np.mean(performance_fold[keys[2]]):^11.3f}{np.mean(performance_fold[keys[3]]):^11.3f}\n')
+    summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}\n')
 
 
 summary.write(f'\n{"¤"*20}')
@@ -315,13 +341,13 @@ summary.write(f'{"¤"*20}\n')
 
 if binary_classification:
     keys = ['Specificity','Recall','Precision', 'F1', 'ROC_AUC']
-    summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}')
-    summary.write(f'{"-"*53}')
-    summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}{performance_ensamble[keys[4]]:^11.3f}')
+    summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}\n')
+    summary.write(f'{"-"*53}\n')
+    summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}{performance_ensamble[keys[4]]:^11.3f} \n')
 else:
     keys = ['Recall','Precision', 'F1', 'ROC_AUC']
-    summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}')
-    summary.write(f'{"-"*44}')
-    summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}')
+    summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}\n')
+    summary.write(f'{"-"*44}\n')
+    summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}\n')
 
 summary.close()
