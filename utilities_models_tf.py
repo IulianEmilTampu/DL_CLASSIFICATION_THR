@@ -1058,6 +1058,59 @@ def test(self, test_dataloader):
     # return test predictions
     return test_gt, test_logits, test_stop-test_start
 
+def test_independent(model, configuration, test_dataloader):
+    '''
+
+    Function that given a trained model outputs the prediction on the test dataset
+
+    Parameters
+    ----------
+
+    model : tensorflow model
+        Trained model
+    config : dict
+        dictionary containing all the information regarding the model training
+    test_dataloader : tensorflow.python.data.ops.dataset_ops.PrefetchDataset
+            Tensorflow dataloader that outputs a tuple of (image, label)
+
+    Outputs
+    -------
+    test_gt : tensorflow.tensor
+        Ground truth values
+    test_logits : tensorflow.tensor
+        Logits predicted values
+    test_time : float
+        Time spent for testing
+
+    Testing loop
+    1 - for all the batches of data in the dataloader
+        - fix labels based on the unique labels specification
+        - compute prediction on all the test images
+    2 - compute accuracy
+    3 - print class accuracy and overall accuracy
+    4 - return groud truth, predicted values and test time
+    '''
+    # initialize variables
+    test_logits = tf.zeros([0, len(configuration["unique_labels"])])
+    test_gt = tf.zeros([0, len(configuration["unique_labels"])])
+
+    step = 0
+    test_start = time.time()
+    for x, y in test_dataloader:
+        x = x.numpy()
+        test_gt = tf.concat([test_gt, fix_labels_v2(y.numpy(), configuration["classification_type"], configuration["unique_labels"])], axis=0)
+        if 'VAE' in configuration['model_save_name']:
+            aus_logits, _, _, _, _, _ = model(x, training=False)
+        else:
+            aus_logits= model(x, training=False)
+        test_logits = tf.concat([test_logits, aus_logits], axis=0)
+
+    test_stop = time.time()
+    print(f'{" "*4}Model accuracy: {accuracy(test_gt, test_logits):.02f}')
+
+    # return test predictions
+    return test_gt, test_logits, test_stop-test_start
+
 def save_model(self):
     '''
 
