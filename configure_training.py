@@ -43,76 +43,76 @@ import utilities_models_tf
 
 ## parse inline parameters
 
-# parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification.')
-# parser.add_argument('-wd','--working_directory' ,required=False, help='Provide the Working Directory where the models_tf.py, utilities.py and utilities_models_tf.py files are.This folder will also be the one where the trained models will be saved. If not provided, the current working directory is used', default=os.getcwd())
-# parser.add_argument('-df', '--dataset_folder', required=True, help='Provide the Dataset Folder where the Train and Test folders are present along with the dataset information file.')
-# parser.add_argument('-tts', '--train_test_split', required=False, help='Provide the path to the train_test_split.json file specifying the test and training dataset.', default=None)
-# parser.add_argument('-mc', '--model_configuration', required=False, help='Provide the Model Configuration (LightOCT, M2, M3, ResNet50, VAE or others if implemented in the models_tf.py file).', default='LightOCT')
-# parser.add_argument('-norm', '--model_normalization', required=False, help='Provide what type of normalization to use inside the model (BatchNorm or GroupNorm).', default='BatchNorm')
-# parser.add_argument('-dr', '--dropout_rate', required=False, help='Provide the dropout rate.', default=0.2)
-# parser.add_argument('-mn', '--model_name', required=False, help='Provide the Model Name. This will be used to create the folder where to save the model. If not provided, the current datetime will be used', default=datetime.now().strftime("%H:%M:%S"))
-# parser.add_argument('-ct', '--classification_type', required=False, help='Provide the Classification Type. Chose between 1 (normal-vs-disease), 2 (normal-vs-enlarged-vs-shrinked) and 3 (normal-vs-all_diseases_available). If not provided, normal-vs-disease will be used.', default='c1')
-# parser.add_argument('-cct', '--custom_classification_type', required=False, help='If the classification type is custom (not one of the dfefault one). If true, training test split will be generated here instead of using the already available one in the dataset folder. Note that all the custom classification arte based on the per-disease class split.', default=False)
-# parser.add_argument('-f', '--folds', required=False, help='Number of folds. Default is 3', default='3')
-# parser.add_argument('-l', '--loss', required=False, help='Loss to use to train the model (cce, wcce or sfce). Default is cce', default='cce')
-# parser.add_argument('-lr', '--learning_rate', required=False, help='Learning rate.', default=0.001)
-# parser.add_argument('-bs', '--batch_size', required=False, help='Batch size.', default=50)
-# parser.add_argument('-is', '--input_size', nargs='+', required=False, help='Model input size.', default=(200,200))
-# parser.add_argument('-ks', '--kernel_size', nargs='+', required=False, help='Encoder conv kernel size.', default=(5,5))
-# parser.add_argument('-augment', '--augmentation', required=False, help='Specify if data augmentation is to be performed (True) or not (False)', default=True)
-# parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension of the VAE latent space', default=128)
-# parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in for the VAE loss', default=0.1)
-# parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconstruction weight in for the VAE loss', default=0.1)
-# parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
-# parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
-# parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
-# args = parser.parse_args()
-#
-# # parse variables
-# working_folder = args.working_directory
-# dataset_folder = args.dataset_folder
-# train_test_split = args.train_test_split
-# model_configuration = args.model_configuration
-# model_normalization = args.model_normalization
-# dropout_rate = float(args.dropout_rate)
-# model_save_name = args.model_name
-# classification_type = args.classification_type
-# custom_classification = args.custom_classification_type == 'True'
-# loss = args.loss
-# learning_rate = float(args.learning_rate)
-# batch_size = int(args.batch_size)
-# input_size = [int(i) for i in args.input_size]
-# data_augmentation = args.augmentation
-# vae_latent_dim = int(args.vae_latent_dim)
-# vae_kl_weight = float(args.vae_kl_weight)
-# vae_reconst_weight = float(args.vae_reconst_weight)
-# N_FOLDS = int(args.folds)
-# verbose = int(args.verbose)
-# imbalance_data_strategy = args.imbalance_data_strategy
-# kernel_size = [int(i) for i in args.kernel_size]
-# debug = args.debug == 'True'
+parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification.')
+parser.add_argument('-wd','--working_directory' ,required=False, help='Provide the Working Directory where the models_tf.py, utilities.py and utilities_models_tf.py files are.This folder will also be the one where the trained models will be saved. If not provided, the current working directory is used', default=os.getcwd())
+parser.add_argument('-df', '--dataset_folder', required=True, help='Provide the Dataset Folder where the Train and Test folders are present along with the dataset information file.')
+parser.add_argument('-tts', '--train_test_split', required=False, help='Provide the path to the train_test_split.json file specifying the test and training dataset.', default=None)
+parser.add_argument('-mc', '--model_configuration', required=False, help='Provide the Model Configuration (LightOCT, M2, M3, ResNet50, VAE or others if implemented in the models_tf.py file).', default='LightOCT')
+parser.add_argument('-norm', '--model_normalization', required=False, help='Provide what type of normalization to use inside the model (BatchNorm or GroupNorm).', default='BatchNorm')
+parser.add_argument('-dr', '--dropout_rate', required=False, help='Provide the dropout rate.', default=0.2)
+parser.add_argument('-mn', '--model_name', required=False, help='Provide the Model Name. This will be used to create the folder where to save the model. If not provided, the current datetime will be used', default=datetime.now().strftime("%H:%M:%S"))
+parser.add_argument('-ct', '--classification_type', required=False, help='Provide the Classification Type. Chose between 1 (normal-vs-disease), 2 (normal-vs-enlarged-vs-shrinked) and 3 (normal-vs-all_diseases_available). If not provided, normal-vs-disease will be used.', default='c1')
+parser.add_argument('-cct', '--custom_classification_type', required=False, help='If the classification type is custom (not one of the dfefault one). If true, training test split will be generated here instead of using the already available one in the dataset folder. Note that all the custom classification arte based on the per-disease class split.', default=False)
+parser.add_argument('-f', '--folds', required=False, help='Number of folds. Default is 3', default='3')
+parser.add_argument('-l', '--loss', required=False, help='Loss to use to train the model (cce, wcce or sfce). Default is cce', default='cce')
+parser.add_argument('-lr', '--learning_rate', required=False, help='Learning rate.', default=0.001)
+parser.add_argument('-bs', '--batch_size', required=False, help='Batch size.', default=50)
+parser.add_argument('-is', '--input_size', nargs='+', required=False, help='Model input size.', default=(200,200))
+parser.add_argument('-ks', '--kernel_size', nargs='+', required=False, help='Encoder conv kernel size.', default=(5,5))
+parser.add_argument('-augment', '--augmentation', required=False, help='Specify if data augmentation is to be performed (True) or not (False)', default=True)
+parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension of the VAE latent space', default=128)
+parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in for the VAE loss', default=0.1)
+parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconstruction weight in for the VAE loss', default=0.1)
+parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
+parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
+parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
+args = parser.parse_args()
 
 # parse variables
-working_folder = '/flush/iulta54/Research/P3-THR_DL/'
-dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
-train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
-model_configuration = 'LightOCT'
-model_save_name = 'TEST'
-classification_type = 'c4'
-custom_classification = True
-loss = 'cce'
-learning_rate = 0.0001
-batch_size = 100
-input_size = [200, 200]
-data_augmentation = True
-vae_latent_dim = 128
-vae_kl_weight = 0.1
-vae_reconst_weight = 0.1
-N_FOLDS = 3
-verbose = 2
-imbalance_data_strategy = 'weights'
-kernel_size = [5,5]
-debug = False
+working_folder = args.working_directory
+dataset_folder = args.dataset_folder
+train_test_split = args.train_test_split
+model_configuration = args.model_configuration
+model_normalization = args.model_normalization
+dropout_rate = float(args.dropout_rate)
+model_save_name = args.model_name
+classification_type = args.classification_type
+custom_classification = args.custom_classification_type == 'True'
+loss = args.loss
+learning_rate = float(args.learning_rate)
+batch_size = int(args.batch_size)
+input_size = [int(i) for i in args.input_size]
+data_augmentation = args.augmentation
+vae_latent_dim = int(args.vae_latent_dim)
+vae_kl_weight = float(args.vae_kl_weight)
+vae_reconst_weight = float(args.vae_reconst_weight)
+N_FOLDS = int(args.folds)
+verbose = int(args.verbose)
+imbalance_data_strategy = args.imbalance_data_strategy
+kernel_size = [int(i) for i in args.kernel_size]
+debug = args.debug == 'True'
+
+# # parse variables
+# working_folder = '/flush/iulta54/Research/P3-THR_DL/'
+# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
+# train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
+# model_configuration = 'LightOCT'
+# model_save_name = 'TEST'
+# classification_type = 'c4'
+# custom_classification = True
+# loss = 'cce'
+# learning_rate = 0.0001
+# batch_size = 100
+# input_size = [200, 200]
+# data_augmentation = True
+# vae_latent_dim = 128
+# vae_kl_weight = 0.1
+# vae_reconst_weight = 0.1
+# N_FOLDS = 3
+# verbose = 2
+# imbalance_data_strategy = 'weights'
+# kernel_size = [5,5]
+# debug = False
 
 # check if working folder and dataset folder exist
 if os.path.isdir(working_folder):
@@ -330,8 +330,8 @@ if custom_classification:
                 # add the extra images to the last class (should always be only one image)
                 n_img[-1] += n_images_per_class % len(l)
             # now actuallly get the images
-            for ll, n in zip(l,n_img):
-                test_filenames.extend(random.sample(per_class_random_files[ll], n))
+            for ll, n in zip(l, n_img):
+                test_filenames.extend(random.sample(per_class_random_files[ll], int(n)))
             print(f'Unique label {l}. Took {n_img} random files from the specified classes.')
         else:
             test_filenames.extend(random.sample(per_class_random_files[l], n_images_per_class))
