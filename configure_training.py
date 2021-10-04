@@ -92,27 +92,27 @@ imbalance_data_strategy = args.imbalance_data_strategy
 kernel_size = [int(i) for i in args.kernel_size]
 debug = args.debug == 'True'
 
-# parse variables
-working_folder = '/flush/iulta54/Research/P3-THR_DL/'
-dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
-train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
-model_configuration = 'LightOCT'
-model_save_name = 'TEST'
-classification_type = 'c7'
-custom_classification = True
-loss = 'cce'
-learning_rate = 0.0001
-batch_size = 100
-input_size = [200, 200]
-data_augmentation = True
-vae_latent_dim = 128
-vae_kl_weight = 0.1
-vae_reconst_weight = 0.1
-N_FOLDS = 3
-verbose = 2
-imbalance_data_strategy = 'weights'
-kernel_size = [5,5]
-debug = False
+# # parse variables
+# working_folder = '/flush/iulta54/Research/P3-THR_DL/'
+# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
+# train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
+# model_configuration = 'LightOCT'
+# model_save_name = 'TEST'
+# classification_type = 'c7'
+# custom_classification = True
+# loss = 'cce'
+# learning_rate = 0.0001
+# batch_size = 100
+# input_size = [200, 200]
+# data_augmentation = True
+# vae_latent_dim = 128
+# vae_kl_weight = 0.1
+# vae_reconst_weight = 0.1
+# N_FOLDS = 3
+# verbose = 2
+# imbalance_data_strategy = 'weights'
+# kernel_size = [5,5]
+# debug = False
 
 # check if working folder and dataset folder exist
 if os.path.isdir(working_folder):
