@@ -43,76 +43,76 @@ import utilities_models_tf
 
 ## parse inline parameters
 
-parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification.')
-parser.add_argument('-wd','--working_directory' ,required=False, help='Provide the Working Directory where the models_tf.py, utilities.py and utilities_models_tf.py files are.This folder will also be the one where the trained models will be saved. If not provided, the current working directory is used', default=os.getcwd())
-parser.add_argument('-df', '--dataset_folder', required=True, help='Provide the Dataset Folder where the Train and Test folders are present along with the dataset information file.')
-parser.add_argument('-tts', '--train_test_split', required=False, help='Provide the path to the train_test_split.json file specifying the test and training dataset.', default=None)
-parser.add_argument('-mc', '--model_configuration', required=False, help='Provide the Model Configuration (LightOCT, M2, M3, ResNet50, VAE or others if implemented in the models_tf.py file).', default='LightOCT')
-parser.add_argument('-norm', '--model_normalization', required=False, help='Provide what type of normalization to use inside the model (BatchNorm or GroupNorm).', default='BatchNorm')
-parser.add_argument('-dr', '--dropout_rate', required=False, help='Provide the dropout rate.', default=0.2)
-parser.add_argument('-mn', '--model_name', required=False, help='Provide the Model Name. This will be used to create the folder where to save the model. If not provided, the current datetime will be used', default=datetime.now().strftime("%H:%M:%S"))
-parser.add_argument('-ct', '--classification_type', required=False, help='Provide the Classification Type. Chose between 1 (normal-vs-disease), 2 (normal-vs-enlarged-vs-shrinked) and 3 (normal-vs-all_diseases_available). If not provided, normal-vs-disease will be used.', default='c1')
-parser.add_argument('-cct', '--custom_classification_type', required=False, help='If the classification type is custom (not one of the dfefault one). If true, training test split will be generated here instead of using the already available one in the dataset folder. Note that all the custom classification arte based on the per-disease class split.', default=False)
-parser.add_argument('-f', '--folds', required=False, help='Number of folds. Default is 3', default='3')
-parser.add_argument('-l', '--loss', required=False, help='Loss to use to train the model (cce, wcce or sfce). Default is cce', default='cce')
-parser.add_argument('-lr', '--learning_rate', required=False, help='Learning rate.', default=0.001)
-parser.add_argument('-bs', '--batch_size', required=False, help='Batch size.', default=50)
-parser.add_argument('-is', '--input_size', nargs='+', required=False, help='Model input size.', default=(200,200))
-parser.add_argument('-ks', '--kernel_size', nargs='+', required=False, help='Encoder conv kernel size.', default=(5,5))
-parser.add_argument('-augment', '--augmentation', required=False, help='Specify if data augmentation is to be performed (True) or not (False)', default=True)
-parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension of the VAE latent space', default=128)
-parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in for the VAE loss', default=0.1)
-parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconstruction weight in for the VAE loss', default=0.1)
-parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
-parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
-parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
-args = parser.parse_args()
+# parser = argparse.ArgumentParser(description='Script that runs a cross-validation training for OCT 2D image classification.')
+# parser.add_argument('-wd','--working_directory' ,required=False, help='Provide the Working Directory where the models_tf.py, utilities.py and utilities_models_tf.py files are.This folder will also be the one where the trained models will be saved. If not provided, the current working directory is used', default=os.getcwd())
+# parser.add_argument('-df', '--dataset_folder', required=True, help='Provide the Dataset Folder where the Train and Test folders are present along with the dataset information file.')
+# parser.add_argument('-tts', '--train_test_split', required=False, help='Provide the path to the train_test_split.json file specifying the test and training dataset.', default=None)
+# parser.add_argument('-mc', '--model_configuration', required=False, help='Provide the Model Configuration (LightOCT, M2, M3, ResNet50, VAE or others if implemented in the models_tf.py file).', default='LightOCT')
+# parser.add_argument('-norm', '--model_normalization', required=False, help='Provide what type of normalization to use inside the model (BatchNorm or GroupNorm).', default='BatchNorm')
+# parser.add_argument('-dr', '--dropout_rate', required=False, help='Provide the dropout rate.', default=0.2)
+# parser.add_argument('-mn', '--model_name', required=False, help='Provide the Model Name. This will be used to create the folder where to save the model. If not provided, the current datetime will be used', default=datetime.now().strftime("%H:%M:%S"))
+# parser.add_argument('-ct', '--classification_type', required=False, help='Provide the Classification Type. Chose between 1 (normal-vs-disease), 2 (normal-vs-enlarged-vs-shrinked) and 3 (normal-vs-all_diseases_available). If not provided, normal-vs-disease will be used.', default='c1')
+# parser.add_argument('-cct', '--custom_classification_type', required=False, help='If the classification type is custom (not one of the dfefault one). If true, training test split will be generated here instead of using the already available one in the dataset folder. Note that all the custom classification arte based on the per-disease class split.', default=False)
+# parser.add_argument('-f', '--folds', required=False, help='Number of folds. Default is 3', default='3')
+# parser.add_argument('-l', '--loss', required=False, help='Loss to use to train the model (cce, wcce or sfce). Default is cce', default='cce')
+# parser.add_argument('-lr', '--learning_rate', required=False, help='Learning rate.', default=0.001)
+# parser.add_argument('-bs', '--batch_size', required=False, help='Batch size.', default=50)
+# parser.add_argument('-is', '--input_size', nargs='+', required=False, help='Model input size.', default=(200,200))
+# parser.add_argument('-ks', '--kernel_size', nargs='+', required=False, help='Encoder conv kernel size.', default=(5,5))
+# parser.add_argument('-augment', '--augmentation', required=False, help='Specify if data augmentation is to be performed (True) or not (False)', default=True)
+# parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension of the VAE latent space', default=128)
+# parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in for the VAE loss', default=0.1)
+# parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconstruction weight in for the VAE loss', default=0.1)
+# parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
+# parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
+# parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
+# args = parser.parse_args()
+#
+# # parse variables
+# working_folder = args.working_directory
+# dataset_folder = args.dataset_folder
+# train_test_split = args.train_test_split
+# model_configuration = args.model_configuration
+# model_normalization = args.model_normalization
+# dropout_rate = float(args.dropout_rate)
+# model_save_name = args.model_name
+# classification_type = args.classification_type
+# custom_classification = args.custom_classification_type == 'True'
+# loss = args.loss
+# learning_rate = float(args.learning_rate)
+# batch_size = int(args.batch_size)
+# input_size = [int(i) for i in args.input_size]
+# data_augmentation = args.augmentation
+# vae_latent_dim = int(args.vae_latent_dim)
+# vae_kl_weight = float(args.vae_kl_weight)
+# vae_reconst_weight = float(args.vae_reconst_weight)
+# N_FOLDS = int(args.folds)
+# verbose = int(args.verbose)
+# imbalance_data_strategy = args.imbalance_data_strategy
+# kernel_size = [int(i) for i in args.kernel_size]
+# debug = args.debug == 'True'
 
 # parse variables
-working_folder = args.working_directory
-dataset_folder = args.dataset_folder
-train_test_split = args.train_test_split
-model_configuration = args.model_configuration
-model_normalization = args.model_normalization
-dropout_rate = float(args.dropout_rate)
-model_save_name = args.model_name
-classification_type = args.classification_type
-custom_classification = args.custom_classification_type == 'True'
-loss = args.loss
-learning_rate = float(args.learning_rate)
-batch_size = int(args.batch_size)
-input_size = [int(i) for i in args.input_size]
-data_augmentation = args.augmentation
-vae_latent_dim = int(args.vae_latent_dim)
-vae_kl_weight = float(args.vae_kl_weight)
-vae_reconst_weight = float(args.vae_reconst_weight)
-N_FOLDS = int(args.folds)
-verbose = int(args.verbose)
-imbalance_data_strategy = args.imbalance_data_strategy
-kernel_size = [int(i) for i in args.kernel_size]
-debug = args.debug == 'True'
-
-# # parse variables
-# working_folder = '/flush/iulta54/Research/P3-THR_DL/'
-# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/NEW_TFR/2D_isotropic_TFR'
-# train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
-# model_configuration = 'LightOCT'
-# model_save_name = 'LightOCT_c4_TEST'
-# classification_type = 'c4'
-# custom_classification = True
-# loss = 'cce'
-# learning_rate = 0.0001
-# batch_size = 100
-# input_size = [200, 200]
-# data_augmentation = True
-# vae_latent_dim = 128
-# vae_kl_weight = 0.1
-# vae_reconst_weight = 0.1
-# N_FOLDS = 3
-# verbose = 2
-# imbalance_data_strategy = 'weights'
-# kernel_size = [5,5]
-# debug = False
+working_folder = '/flush/iulta54/Research/P3-THR_DL/'
+dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
+train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
+model_configuration = 'LightOCT'
+model_save_name = 'TEST'
+classification_type = 'c4'
+custom_classification = True
+loss = 'cce'
+learning_rate = 0.0001
+batch_size = 100
+input_size = [200, 200]
+data_augmentation = True
+vae_latent_dim = 128
+vae_kl_weight = 0.1
+vae_reconst_weight = 0.1
+N_FOLDS = 3
+verbose = 2
+imbalance_data_strategy = 'weights'
+kernel_size = [5,5]
+debug = False
 
 # check if working folder and dataset folder exist
 if os.path.isdir(working_folder):
@@ -209,6 +209,10 @@ classification_type_dict['c6'] = {}
 classification_type_dict['c6']['unique_labels'] = [1, [2, 3, 4, 5]]
 classification_type_dict['c6']['class_labels'] = ['enlarged', 'shrunk-depleted']
 
+classification_type_dict['c7'] = {}
+classification_type_dict['c7']['unique_labels'] = [0, 2, 3, 4, 5]
+classification_type_dict['c7']['class_labels'] = ['normal', 'Adenoma', 'Hashimoto', 'Graves', 'Cancer']
+
 # check if we are using a default classification type. If yes, use the train_test_split.json file
 
 if custom_classification:
@@ -268,18 +272,21 @@ if custom_classification:
     importlib.reload(utilities)
     '''
     Use n_images_per_class of at least 2 volumes for each class as test sample
-    1 - find unique volumes for each class
+    1 - find unique volumes for normal and all the different disease.
     2 - randomly select volumes for test (to reach n_images_per_class images)
     3 - randomly select n_images_per_class from the selected volumes for each class
-    4 - get all the remaining files for train+validation
+    4 - cluster disease/normal based on the classification_type specification.
+        Each class specified by the classification_type is composed by an equal
+        number of images from diseases/normal that it is made of.
+    5 - get all the remaining files for train+validation (make sure not to
+        include disease/normal that are not specified in the custom classification)
     '''
 
-
+    # get all files organized based on the more detailed classification (per disease)
     file_names, labels, per_class_file_names = utilities.get_organized_files(file_names,
                         classification_type=classification_type,
                         custom=True,
-                        custom_labels=classification_type_dict[classification_type]['unique_labels'])
-    n_classes = len(classification_type_dict[classification_type]['unique_labels'])
+                        custom_labels=[0,1,2,3,4,5])
 
     # 1
     per_class_unique_volumes = []
@@ -288,36 +295,57 @@ if custom_classification:
         aus = [os.path.basename(i[0:i.find('c1')-1]) for i in c]
         per_class_unique_volumes.append(list(dict.fromkeys(aus)))
 
-    # 2
+    # 2 and 3
     random.seed(29122009)
     per_class_random_files = []
-    index_of_selected_files = []
+    per_class_index_of_selected_files = []
 
-    for c in per_class_unique_volumes:
+    for idx2, c in enumerate(per_class_unique_volumes):
         # for this class, shuffle the volumes and get all the images untill we reach the limit
         random.shuffle(c)
         count = 0
         idx = 0
         per_class_random_files.append([])
+        per_class_index_of_selected_files.append([])
         while count <= n_images_per_class or idx < min_n_volumes:
             # get all the files from that volume
-            indexes = [i for i, f in enumerate(file_names) if c[idx] in f]
-            per_class_random_files[-1].extend([file_names[i] for i in indexes])
-            index_of_selected_files.extend(indexes)
+            indexes = [i for i, f in enumerate(per_class_file_names[idx2]) if c[idx] in f]
+            per_class_random_files[-1].extend([per_class_file_names[idx2][i] for i in indexes])
+            per_class_index_of_selected_files[-1].extend(indexes)
             count += len(indexes)
             idx += 1
 
-    for i, c in enumerate(per_class_random_files):
-        print(f'{"Unique labels:"+str(classification_type_dict[classification_type]["unique_labels"][i]):26s}: {len(c):4d} test files')
+    # untill now we have files from every disease and for the normal samples all separated.
+    # Now cluster based on the classification_type setting. Use the same number of images
+    # from every disease/normal in case of them being set to the same class.
 
-    # 3 get exactly n_images_per_class from each class and set it to the test set
+    # 4
     test_filenames = []
-    for f in per_class_random_files:
-        test_filenames.extend(random.sample(f, n_images_per_class))
 
-    # 4 get the remaining training validation files
-    train_val_filenames = [f for i, f in enumerate(file_names) if i not in index_of_selected_files]
+    for l in classification_type_dict[classification_type]["unique_labels"]:
+        if type(l) is list:
+            # get how many images to be take from each disease/normal during the aggregation
+            n_img = [n_images_per_class/len(l)]*len(l)
+            if n_images_per_class % len(l) != 0:
+                # add the extra images to the last class (should always be only one image)
+                n_img[-1] += n_images_per_class % len(l)
+            # now actuallly get the images
+            for ll, n in zip(l,n_img):
+                test_filenames.extend(random.sample(per_class_random_files[ll], n))
+            print(f'Unique label {l}. Took {n_img} random files from the specified classes.')
+        else:
+            test_filenames.extend(random.sample(per_class_random_files[l], n_images_per_class))
+            print(f'Unique label {l}. Took {n_images_per_class} random files.')
 
+    # 5 get the remaining training validation files
+    train_val_filenames = []
+
+    for l in classification_type_dict[classification_type]["unique_labels"]:
+        if type(l) is list:
+            for ll in l:
+                train_val_filenames.extend([f for i, f in enumerate(per_class_random_files[ll]) if i not in per_class_index_of_selected_files[ll]])
+        else:
+            train_val_filenames.extend([f for i, f in enumerate(per_class_random_files[l]) if i not in per_class_index_of_selected_files[l]])
 
 ## compute class weights on the training dataset and apply imbalance data strategy
 
@@ -371,7 +399,7 @@ if imbalance_data_strategy == 'oversampling':
 
 elif imbalance_data_strategy == 'weights':
     print(f'\nUsing {imbalance_data_strategy} strategy to handle imbalance data.')
-    print(f'Setting loss function to wcce given the oversampling strategy')
+    print(f'Setting loss function to wcce given the {imbalance_data_strategy} strategy')
     class_weights = class_weights.sum() / class_weights**1
     # class_weights = class_weights / class_weights.sum()
     loss = 'wcce'
@@ -384,17 +412,16 @@ elif imbalance_data_strategy == 'none':
 n_train = len(train_val_filenames)
 n_test = len(test_filenames)
 
-# # ############## check that no testing files are in the training validation pool
-# #
-# print('Checking if any test samples are in the training - validation pool (this may take time...)')
-# duplicated = []
-# for idx, ts in enumerate(test_filenames):
-#     print(f'Checked {idx+1}/{len(test_filenames)} \r', end='')
-#     for tr in train_val_filenames:
-#         if os.path.basename(ts) == os.path.basename(tr):
-#             duplicated.append(ts)
-#             raise ValueError(f'Some of the testing files are in the trianing - validation pool ({len(duplicated)} out of {len(test_filenames)}). CHECK IMPLEMENTATION!!!')
-# print('No testing files found in the training - validation pool. All good!!!')
+# ############## check that no testing files are in the training validation pool
+print('Checking if any test samples are in the training - validation pool (this may take time...)')
+duplicated = []
+for idx, ts in enumerate(test_filenames):
+    print(f'Checked {idx+1}/{len(test_filenames)} \r', end='')
+    for tr in train_val_filenames:
+        if os.path.basename(ts) == os.path.basename(tr):
+            duplicated.append(ts)
+            raise ValueError(f'Some of the testing files are in the trianing - validation pool ({len(duplicated)} out of {len(test_filenames)}). CHECK IMPLEMENTATION!!!')
+print('No testing files found in the training - validation pool. All good!!!')
 
 print(f'\nWill train and validate on {n_train} images (some might have been removed since not classifiable in this task)')
 print(f'Will test on {n_test} images ({n_images_per_class} for each class)')
