@@ -49,7 +49,9 @@ args = vars(ap.parse_args())
 
 
 ## 1 load folders and information about the model
-model_path = '/flush/iulta54/Research/P3-THR_DL/trained_models/M4_c1_Range_constantLr_001'
+trained_models_path = "/flush/iulta54/Research/P3-THR_DL/trained_models/"
+model_name= "M4_c7_BatchNorm_dr0.2_lr0.00001_wcce_weights_batch64"
+model_path = os.path.join(trained_models_path, model_name)
 save_path = os.path.join(model_path, 'Gard-Cam')
 # check if save_path exists if not, create it
 if not os.path.isdir(save_path):
@@ -95,8 +97,8 @@ importlib.reload(utilities)
 importlib.reload(utilities_models_tf)
 
 seed = 29122009
-batch_size = 200
-images_to_show = 1000
+batch_size = 100
+images_to_show = 50
 
 # check data coming out of the generators
 debug = True
@@ -105,7 +107,7 @@ model_to_check = 0
 
 if debug is True:
         test_dataset_debug = utilities.TFR_2D_dataset(test_img,
-                    dataset_type = 'test',
+                    dataset_type = 'train',
                     batch_size=batch_size,
                     buffer_size=5000,
                     crop_size=crop_size)
@@ -117,7 +119,7 @@ if debug is True:
 
 # create generator based on model specifications
 test_dataset = utilities.TFR_2D_dataset(test_img,
-                dataset_type = 'test',
+                dataset_type = 'train',
                 batch_size=batch_size,
                 buffer_size=1000,
                 crop_size=crop_size)
@@ -134,6 +136,12 @@ if debug is True:
     for layer in reversed(model.layers):
         print(layer.name, layer.output_shape)
 
+# deactivate augmentation layer
+model.layers[1].layers[0].horizontal = False
+model.layers[1].layers[0].vertical = False
+model.layers[1].layers[1].upper = 0
+model.layers[1].layers[1].lower = 0
+
 ##  compute model predicion on images until reached the number to show
 images = []
 pred_logits = tf.zeros([0, len(config['unique_labels'])])
@@ -141,7 +149,7 @@ labels = tf.zeros([0, len(config['unique_labels'])])
 
 for x, y in test_dataset:
     # get prediction
-    y_logits = model(x)
+    y_logits = model(x, training=False)
     # save images for later
     images.extend(x.numpy())
     # save predictions taking into consideration VAE models
