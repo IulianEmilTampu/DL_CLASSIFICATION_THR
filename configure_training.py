@@ -66,6 +66,7 @@ parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconst
 parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
 parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
 parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
+parser.add_argument('-ct', '--check_training', required=False, help='If True, checks that none of the test images is in the training/validation set', default=True)
 args = parser.parse_args()
 
 # parse variables
@@ -91,6 +92,7 @@ verbose = int(args.verbose)
 imbalance_data_strategy = args.imbalance_data_strategy
 kernel_size = [int(i) for i in args.kernel_size]
 debug = args.debug == 'True'
+check_training = args.check_training == 'True'
 
 # # parse variables
 # working_folder = '/flush/iulta54/Research/P3-THR_DL/'
@@ -413,15 +415,18 @@ n_train = len(train_val_filenames)
 n_test = len(test_filenames)
 
 # ############## check that no testing files are in the training validation pool
-print('Checking if any test samples are in the training - validation pool (this may take time...)')
-duplicated = []
-for idx, ts in enumerate(test_filenames):
-    print(f'Checked {idx+1}/{len(test_filenames)} \r', end='')
-    for tr in train_val_filenames:
-        if os.path.basename(ts) == os.path.basename(tr):
-            duplicated.append(ts)
-            raise ValueError(f'Some of the testing files are in the trianing - validation pool ({len(duplicated)} out of {len(test_filenames)}). CHECK IMPLEMENTATION!!!')
-print('No testing files found in the training - validation pool. All good!!!')
+if check_training:
+    print('Checking if any test samples are in the training - validation pool (this may take time...)')
+    duplicated = []
+    for idx, ts in enumerate(test_filenames):
+        print(f'Checked {idx+1}/{len(test_filenames)} \r', end='')
+        for tr in train_val_filenames:
+            if os.path.basename(ts) == os.path.basename(tr):
+                duplicated.append(ts)
+                raise ValueError(f'Some of the testing files are in the trianing - validation pool ({len(duplicated)} out of {len(test_filenames)}). CHECK IMPLEMENTATION!!!')
+    print('No testing files found in the training - validation pool. All good!!!')
+else:
+    print(f'\n {"¤"*10} \n ATTENTION! Note checking if test images are in the training/validation pool. \n Use with care!!! \n {"¤"}*10')
 
 print(f'\nWill train and validate on {n_train} images (some might have been removed since not classifiable in this task)')
 print(f'Will test on {n_test} images ({n_images_per_class} for each class)')
