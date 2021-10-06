@@ -426,7 +426,7 @@ if check_training:
                 raise ValueError(f'Some of the testing files are in the trianing - validation pool ({len(duplicated)} out of {len(test_filenames)}). CHECK IMPLEMENTATION!!!')
     print('No testing files found in the training - validation pool. All good!!!')
 else:
-    print(f'\n {"¤"*10} \n ATTENTION! Note checking if test images are in the training/validation pool. \n Use with care!!! \n {"¤"}*10')
+    print(f'\n {"¤"*10} \n ATTENTION! Not checking if test images are in the training/validation pool. \n Use with care!!! \n {"¤"*10}')
 
 print(f'\nWill train and validate on {n_train} images (some might have been removed since not classifiable in this task)')
 print(f'Will test on {n_test} images ({n_images_per_class} for each class)')
