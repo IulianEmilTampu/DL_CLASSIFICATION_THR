@@ -314,7 +314,7 @@ def plotConfusionMatrix(GT, PRED, classes, Labels=None, cmap=plt.cm.Blues, saveP
             fig.savefig(os.path.join(savePath, 'ConfisionMatrix_ensemble_prediction.pdf'), bbox_inches='tight', dpi = 100)
             fig.savefig(os.path.join(savePath, 'ConfisionMatrix_ensemble_prediction.png'), bbox_inches='tight', dpi = 100)
         else:
-            raise ValueError('Invalida save path: {}'.format(savePath))
+            raise ValueError('Invalid save path: {}'.format(os.path.join(savePath, 'ConfisionMatrix_ensemble_prediction.pdf')))
 
     if draw is True:
         plt.draw()

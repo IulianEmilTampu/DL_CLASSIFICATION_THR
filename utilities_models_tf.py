@@ -822,6 +822,7 @@ def train_VAE(self, training_dataloader,
         val_epoch_loss_avg.reset_states()
         val_epoch_accuracy.reset_states()
         val_epoch_f1.reset_states()
+        val_epoch_f1_outside = []
 
         # compute learning rate based on the scheduler
         if self.scheduler == 'linear':
@@ -915,6 +916,7 @@ def train_VAE(self, training_dataloader,
             val_epoch_loss_avg.update_state(val_loss)
             val_epoch_accuracy.update_state(y, self.model(x, training=False)[0])
             val_epoch_f1.update_state(to_categorical(y, num_classes=self.num_classes), self.model(x, training=False)[0])
+            val_epoch_f1_outside.append()
 
             # print values
             if self.verbose == 2:
