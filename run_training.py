@@ -210,6 +210,15 @@ for cv in range(config['N_FOLDS']):
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size']
                         )
+    elif config['model_configuration'] == 'VAE5':
+        model = models_tf.VAE4(number_of_input_channels = 1,
+                        model_name=config['model_configuration'],
+                        num_classes = len(config['unique_labels']),
+                        data_augmentation=config['data_augmentation'],
+                        class_weights = config['class_weights'],
+                        kernel_size=config['kernel_size'],
+                        input_size=config['input_size']
+                        )
     else:
         model = models_tf.LightOCT(number_of_input_channels = 1,
                         model_name='LightOCT',
@@ -281,7 +290,7 @@ for cv in range(config['N_FOLDS']):
                             power = 0.1,
                             max_epochs=500,
                             early_stopping=True,
-                            patience=20,
+                            patience=10,
                             warm_up = warm_up,
                             warm_up_epochs = warm_up_epochs,
                             warm_up_learning_rate = warm_up_learning_rate,
@@ -300,7 +309,7 @@ for cv in range(config['N_FOLDS']):
                             power = 0.1,
                             max_epochs=500,
                             early_stopping=True,
-                            patience=20,
+                            patience=10,
                             save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                             save_model_architecture_figure=True if cv==0 else False,
                             warm_up = warm_up,
