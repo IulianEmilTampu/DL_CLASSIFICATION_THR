@@ -66,7 +66,7 @@ parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconst
 parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
 parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
 parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
-parser.add_argument('-ct', '--check_training', required=False, help='If True, checks that none of the test images is in the training/validation set', default=True)
+parser.add_argument('-ctd', '--check_training', required=False, help='If True, checks that none of the test images is in the training/validation set', default=True)
 args = parser.parse_args()
 
 # parse variables
