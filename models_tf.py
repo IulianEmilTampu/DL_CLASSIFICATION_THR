@@ -1262,7 +1262,7 @@ class VAE4(object):
         # clip [-1,1] since using tanh as output of the decoder
         augmented_norm = tf.clip_by_value(x, clip_value_min=-1, clip_value_max=1)
 
-        # build encoder with ResNet-like bloks
+        # build encoder with Inception-like bloks
         def Encoder_conv_block(inputs, n_filters):
             '''
             Takes the input and processes it through three a 3x3 kernel with
@@ -1352,8 +1352,8 @@ class VAE4(object):
         x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim)(z)
         x = tf.keras.layers.LeakyReLU()(x)
         x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],self.vae_latent_dim))(x)
-        x = resize_convolution(x, final_shape=(aus_dim[0]*2, aus_dim[0]*2), filters=64)
-        x = resize_convolution(x, final_shape=(aus_dim[0]*4, aus_dim[0]*4), filters=32)
+        x = resize_convolution(x, final_shape=(aus_dim[0]*2, aus_dim[0]*2), filters=128)
+        x = resize_convolution(x, final_shape=(aus_dim[0]*4, aus_dim[0]*4), filters=64)
         x = resize_convolution(x, final_shape=(aus_dim[0]*8, aus_dim[0]*8), filters=32)
         decoder_outputs = tf.keras.layers.Conv2DTranspose(self.number_of_input_channels, 3, activation='tanh', padding='same')(x)
 
@@ -1365,3 +1365,170 @@ class VAE4(object):
         self.num_filter_per_layer = [16, 32, 64]
         self.custom_model = False
 
+## VAE5 with M4-like encoder and decoder
+class VAE5(object):
+
+    def __init__(self, number_of_input_channels,
+                    num_classes,
+                    input_size,
+                    data_augmentation=True,
+                    class_weights=None,
+                    kernel_size=(5,5),
+                    model_name='VAE5',
+                    vae_latent_dim=128,
+                    debug=False):
+
+        self.number_of_input_channels = number_of_input_channels
+        self.num_classes = num_classes
+        self.input_size=input_size
+        self.debug = debug
+        if class_weights is None:
+            self.class_weights = np.ones([1, self.num_classes])
+        else:
+            self.class_weights = class_weights
+
+        self.model_name = model_name
+        self.vae_latent_dim = vae_latent_dim
+        self.kernel_size=kernel_size
+
+        # pre-processing steps
+        inputs = Input(shape=[None, None, self.number_of_input_channels])
+
+        x = utilities_models_tf.augmentor(inputs)
+
+        # clip [-1,1] since using tanh as output of the decoder
+        augmented_norm = tf.clip_by_value(x, clip_value_min=-1, clip_value_max=1)
+
+        # build encoder with Inception-like bloks
+        def Encoder_conv_block(inputs, n_filters):
+            '''
+            Takes the input and processes it through three a 3x3 kernel with
+            dilation of 0, 1 and 2 (simulating a 3x3, 5x5 and 7x7 convolution).
+            The result is then concatenated along with the initial input,
+            convolved through a 1x1 convolution and passed through an activation function.
+            '''
+            y = Conv2D(filters=n_filters,kernel_size=(1,1),padding='same', dilation_rate=1)(inputs)
+            # perform conv with different kernel sizes
+            conv3 = Conv2D(filters=n_filters,kernel_size=(3,3),padding='same', dilation_rate=1)(inputs)
+            conv5 = Conv2D(filters=n_filters,kernel_size=(3,3),padding='same', dilation_rate=2)(inputs)
+            conv7 = Conv2D(filters=n_filters,kernel_size=(3,3),padding='same', dilation_rate=3)(inputs)
+            # concatenate
+            x = tf.concat([conv3, conv5, conv7, y], axis=-1)
+            # conbine the information af all filters together
+            x = Conv2D(filters=n_filters,kernel_size=(1,1),padding='same')(x)
+            # normalization
+            # x = tfa.layers.GroupNormalization(groups=int(n_filters/4))(x)
+            x = BatchNormalization()(x)
+            # through the activation
+            return tf.keras.layers.LeakyReLU()(x)
+
+        # build sampler
+        class Sampling(tf.keras.layers.Layer):
+            ''' Uses (z_mean, z_log_var) to sample z, the vector encoding the image data'''
+
+            def call(self, inputs):
+                z_mean, z_log_var = inputs
+                # get the dimentions of how many samples are needed
+                batch = tf.shape(z_mean)[0]
+                dim = tf.shape(z_mean)[1]
+                # generate a normal random distribution
+                epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
+                # convert the random distribution to the z_mean, z_log_var distribution (reparametrization trick)
+                return z_mean + tf.exp(0.5 * z_log_var) * epsilon
+
+        # CNN encoder
+        # build encoder
+        x = Encoder_conv_block(x, n_filters=8)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+        x = Encoder_conv_block(x, n_filters=16)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+        x = Encoder_conv_block(x, n_filters=32)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+
+        # bottle-neck
+        x = Conv2D(filters=64, kernel_size=kernel_size)(x)
+        x = Conv2D(filters=128, kernel_size=kernel_size)(x)
+        x = BatchNormalization()(x)
+        x = LeakyReLU()(x)
+
+        # encoding vector
+        encoding_vector = GlobalMaxPooling2D()(x)
+
+        # FCN
+        pred = Dropout(rate=0.2)(encoding_vector)
+        pred = Dense(units=60, activation='relu')(pred)
+        pred = Dropout(rate=0.4)(pred)
+        pred = Dense(units=self.num_classes)(pred)
+
+        # sampling
+        z_mean = Dense(self.vae_latent_dim, name='z_mean')(encoding_vector)
+        z_log_var = Dense(self.vae_latent_dim, name='z_log_var')(encoding_vector)
+        z = Sampling()([z_mean, z_log_var])
+
+        # build decoder
+        aus_dim = [int(self.input_size[0] / 2**3), int(self.input_size[1] / 2**3)]
+
+        # x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim, activation='relu')(z)
+        # x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],128))(x)
+        # x = tf.keras.layers.Conv2DTranspose(128, 5, activation='relu', strides=2, padding='same')(x)
+        # x = tf.keras.layers.Conv2DTranspose(64, 5, activation='relu', strides=2, padding='same')(x)
+        # x = tf.keras.layers.Conv2DTranspose(32, 5, activation='relu', strides=2, padding='same')(x)
+        #
+        # decoder_outputs = tf.keras.layers.Conv2DTranspose(1,5,activation='tanh', padding='same')(x)
+
+        # build encoder with Inception-like bloks
+        def Decoder_conv_block(inputs, n_filters, final_shape):
+            '''
+            Takes the input and processes it through three a 3x3 kernel with
+            dilation of 0, 1 and 2 (simulating a 3x3, 5x5 and 7x7 convolution).
+            The result is then concatenated along with the initial input,
+            convolved through a 1x1 convolution and passed through an activation function.
+            '''
+
+            # Utility function to perform resized convolution
+            def resize_convolution(x, final_shape, filters, kernel_size=(3,3), dilation_rate=1):
+                upsample = tf.image.resize(images=x,
+                                                size=final_shape,
+                                                method=tf.image.ResizeMethod.BILINEAR)
+                up_conv = Conv2D(filters=filters,
+                                kernel_size=kernel_size,
+                                dilation_rate=dilation_rate,
+                                padding='same',
+                                activation='relu')(upsample)
+                return up_conv
+
+            y = resize_convolution(inputs, final_shape, n_filters, kernel_size=(1,1), dilation_rate=1)
+            # perform resize_conv with different kernel sizes
+            conv3 = resize_convolution(inputs, final_shape, n_filters, kernel_size=(3,3), dilation_rate=1)
+            conv5 = resize_convolution(inputs, final_shape, n_filters, kernel_size=(3,3), dilation_rate=2)
+            conv7 = resize_convolution(inputs, final_shape, n_filters, kernel_size=(3,3), dilation_rate=3)
+
+            # concatenate
+            x = tf.concat([conv3, conv5, conv7, y], axis=-1)
+            # conbine the information af all filters together
+            x = Conv2D(filters=n_filters,kernel_size=(1,1),padding='same')(x)
+            # normalization
+            x = BatchNormalization()(x)
+            # through the activation
+            return tf.keras.layers.LeakyReLU()(x)
+
+        # reshape encoded vector and make ready for decoder step
+        x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim)(z)
+        x = tf.keras.layers.LeakyReLU()(x)
+        x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],self.vae_latent_dim))(x)
+
+        # decode
+        x = resize_convolution(x, n_filters=128, final_shape=(aus_dim[0]*2, aus_dim[0]*2))
+        x = resize_convolution(x, n_filters=64, final_shape=(aus_dim[0]*4, aus_dim[0]*4))
+        x = resize_convolution(x, n_filters=32, final_shape=(aus_dim[0]*8, aus_dim[0]*8))
+        # bring decoded image to original input number of channels
+        decoder_outputs = Conv2D(filters=self.number_of_input_channels, kernel_size=(3,3), padding="same", activation="tanh")(x)
+
+        # finally create model
+        self.model = Model(inputs=inputs, outputs=[pred, decoder_outputs, augmented_norm, z_mean, z_log_var, z], name=model_name)
+
+        # save model paramenters
+        self.num_filter_start = 16
+        self.depth = 3
+        self.num_filter_per_layer = [16, 32, 64]
+        self.custom_model = False
