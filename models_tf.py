@@ -590,7 +590,7 @@ class VAE_original(object):
 
         x = utilities_models_tf.augmentor(inputs)
 
-        augmented_norm = x
+        augmented_norm = tf.clip_by_value(x, clip_value_min=-1, clip_value_max=1)
 
         # build sampler
         class Sampling(tf.keras.layers.Layer):
