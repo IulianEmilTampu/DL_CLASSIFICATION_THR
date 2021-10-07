@@ -709,7 +709,7 @@ class VAE_original(object):
             return up_conv
 
         x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim)(z)
-        x = tf.keras.layers.LeakyReLU()(x)
+        # x = tf.keras.layers.LeakyReLU()(x)
         x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],self.vae_latent_dim))(x)
         x = resize_convolution(x, final_shape=(aus_dim[0]*2, aus_dim[0]*2), filters=128)
         x = resize_convolution(x, final_shape=(aus_dim[0]*4, aus_dim[0]*4), filters=64)
@@ -1350,7 +1350,7 @@ class VAE4(object):
             return up_conv
 
         x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim)(z)
-        x = tf.keras.layers.LeakyReLU()(x)
+        # x = tf.keras.layers.LeakyReLU()(x)
         x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],self.vae_latent_dim))(x)
         x = resize_convolution(x, final_shape=(aus_dim[0]*2, aus_dim[0]*2), filters=128)
         x = resize_convolution(x, final_shape=(aus_dim[0]*4, aus_dim[0]*4), filters=64)
@@ -1514,7 +1514,7 @@ class VAE5(object):
 
         # reshape encoded vector and make ready for decoder step
         x = Dense(aus_dim[0] * aus_dim[0] * self.vae_latent_dim)(z)
-        x = tf.keras.layers.LeakyReLU()(x)
+        # x = tf.keras.layers.LeakyReLU()(x)
         x = tf.keras.layers.Reshape((aus_dim[0],aus_dim[0],self.vae_latent_dim))(x)
 
         # decode
