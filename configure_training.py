@@ -215,6 +215,26 @@ classification_type_dict['c7'] = {}
 classification_type_dict['c7']['unique_labels'] = [0, 2, 3, 4, 5]
 classification_type_dict['c7']['class_labels'] = ['normal', 'Adenoma', 'Hashimoto', 'Graves', 'Cancer']
 
+classification_type_dict['c8'] = {}
+classification_type_dict['c8']['unique_labels'] = [0, 2]
+classification_type_dict['c8']['class_labels'] = ['normal', 'Adenoma']
+
+classification_type_dict['c9'] = {}
+classification_type_dict['c9']['unique_labels'] = [2, 3, 4, 5]
+classification_type_dict['c9']['class_labels'] = ['Adenoma', 'Hashimoto', 'Graves', 'Cancer']
+
+classification_type_dict['c10'] = {}
+classification_type_dict['c10']['unique_labels'] = [0, 3]
+classification_type_dict['c10']['class_labels'] = ['normal', 'Hashimoto']
+
+classification_type_dict['c11'] = {}
+classification_type_dict['c11']['unique_labels'] = [0, 4]
+classification_type_dict['c11']['class_labels'] = ['normal', 'Graves']
+
+classification_type_dict['c12'] = {}
+classification_type_dict['c12']['unique_labels'] = [0, 5]
+classification_type_dict['c12']['class_labels'] = ['normal', 'Cancer']
+
 # check if we are using a default classification type. If yes, use the train_test_split.json file
 
 if custom_classification:
