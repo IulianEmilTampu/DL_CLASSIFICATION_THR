@@ -50,12 +50,12 @@ log_folder=$working_folder/trained_models_log
 
 
  ############################################################################
- ################################ TESTING M4 ################################
+ ################################ TESTING  ################################
  ############################################################################
 
-classification_type=c9
+classification_type=c1
 
-model_configuration=M4
+model_configuration=VAE_original
 
 # declare an array variable
 declare -a normalization=BatchNorm
@@ -75,9 +75,9 @@ python3 -u run_training.py -cf $working_folder/trained_models/$save_model_name/c
  ################################ TESTING M4 ################################
  ############################################################################
 
-classification_type=c11
+classification_type=c2
 
-model_configuration=M4
+model_configuration=VAE_original
 
 # declare an array variable
 declare -a normalization=BatchNorm
@@ -97,9 +97,9 @@ python3 -u run_training.py -cf $working_folder/trained_models/$save_model_name/c
  ################################ TESTING M4 ################################
  ############################################################################
 
-classification_type=c12
+classification_type=c3
 
-model_configuration=M4
+model_configuration=VAE_original
 
 # declare an array variable
 declare -a normalization=BatchNorm
