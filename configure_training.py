@@ -60,13 +60,25 @@ parser.add_argument('-bs', '--batch_size', required=False, help='Batch size.', d
 parser.add_argument('-is', '--input_size', nargs='+', required=False, help='Model input size.', default=(200,200))
 parser.add_argument('-ks', '--kernel_size', nargs='+', required=False, help='Encoder conv kernel size.', default=(5,5))
 parser.add_argument('-augment', '--augmentation', required=False, help='Specify if data augmentation is to be performed (True) or not (False)', default=True)
-parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension of the VAE latent space', default=128)
-parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in for the VAE loss', default=0.1)
-parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconstruction weight in for the VAE loss', default=0.1)
 parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
 parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
 parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
 parser.add_argument('-ctd', '--check_training', required=False, help='If True, checks that none of the test images is in the training/validation set', default=True)
+
+# VAE arguments
+parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension of the VAE latent space', default=128)
+parser.add_argument('-vkl', '--vae_kl_weight',required=False, help='KL weight in for the VAE loss', default=0.1)
+parser.add_argument('-vrl', '--vae_reconst_weight',required=False, help='Reconstruction weight in for the VAE loss', default=0.1)
+
+
+# ViT arguments
+parser.add_argument('-vit_ps', '--vit_patch_size', required=False, help='Patch size setting for the ViT model', default=16)
+parser.add_argument('-vit_pd', '--vit_projection_dim', required=False, help='Projection dimension for the ViT model', default=64)
+parser.add_argument('-vit_nh', '--vit_num_heads', required=False, help='Number of attention heads for the ViT model', default=4)
+parser.add_argument('-vit_mhu', '--vit_mlp_head_units', nargs='+', required=False, help='Size of the dense layers of the final classifier in the ViT model', default=[2048, 1024])
+parser.add_argument('-vit_tl', '--vit_transformer_layers', required=False, help='Number of transformer layer in teh ViT model.', default=8)
+parser.add_argument('-vit_tu', '--vit_transformer_units', nargs='+', required=False, help='# Size of the transformer layers in the ViT model', default=None)
+
 args = parser.parse_args()
 
 # parse variables
@@ -84,9 +96,6 @@ learning_rate = float(args.learning_rate)
 batch_size = int(args.batch_size)
 input_size = [int(i) for i in args.input_size]
 data_augmentation = args.augmentation
-vae_latent_dim = int(args.vae_latent_dim)
-vae_kl_weight = float(args.vae_kl_weight)
-vae_reconst_weight = float(args.vae_reconst_weight)
 N_FOLDS = int(args.folds)
 verbose = int(args.verbose)
 imbalance_data_strategy = args.imbalance_data_strategy
@@ -94,7 +103,23 @@ kernel_size = [int(i) for i in args.kernel_size]
 debug = args.debug == 'True'
 check_training = args.check_training == 'True'
 
-# # parse variables
+# VAE variables
+vae_latent_dim = int(args.vae_latent_dim)
+vae_kl_weight = float(args.vae_kl_weight)
+vae_reconst_weight = float(args.vae_reconst_weight)
+
+# ViT variables
+vit_patch_size = int(args.vit_patch_size)
+vit_projection_dim = int(args.vit_projection_dim)
+vit_num_heads = int(args.vit_num_heads)
+vit_mlp_head_units = [int(i) for i in args.vit_mlp_head_units]
+vit_transformer_layers = int(args.vit_transformer_layers)
+vit_transformer_units = args.vit_transformer_units
+if vit_transformer_units == None:
+    # compute default
+    vit_transformer_units = [vit_projection_dim * 2, vit_projection_dim]
+
+# # # # # # # # # # parse variables
 # working_folder = '/flush/iulta54/Research/P3-THR_DL/'
 # dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
 # train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
@@ -107,14 +132,27 @@ check_training = args.check_training == 'True'
 # batch_size = 100
 # input_size = [200, 200]
 # data_augmentation = True
-# vae_latent_dim = 128
-# vae_kl_weight = 0.1
-# vae_reconst_weight = 0.1
 # N_FOLDS = 3
 # verbose = 2
 # imbalance_data_strategy = 'weights'
 # kernel_size = [5,5]
 # debug = False
+
+# if "VAE" in model_configuration:
+#     vae_latent_dim = 128
+#     vae_kl_weight = 0.1
+#     vae_reconst_weight = 0.1
+#
+# if "ViT" in model_configuration:
+#     vit_patch_size = 16
+#     vit_projection_dim = 64
+#     vit_num_heads = 8
+#     vit_mlp_head_units = [2048,  1024]
+#     vit_transformer_layers = 8
+#     vit_transformer_units = None
+#     if vit_transformer_units == None:
+#         # compute default
+#         vit_transformer_units = [vit_projection_dim * 2, vit_projection_dim]
 
 # check if working folder and dataset folder exist
 if os.path.isdir(working_folder):
@@ -147,9 +185,6 @@ else:
 
 print(f'{"Working directory":<26s}: {working_folder}')
 print(f'{"Model configuration":<26s}: {model_configuration}')
-if model_configuration == 'VAE':
-    print(f'{"VAE latent space dimension":<26s}: {vae_latent_dim}')
-    print(f'{"VAE KL loss weight":<26s}: {vae_kl_weight}')
 print(f'{"Model save name":<26s}: {model_save_name}')
 print(f'{"Classification type":<26s}: {classification_type}')
 print(f'{"Custom classification":<26s}: {custom_classification}')
@@ -158,6 +193,14 @@ print(f'{"Learning rate":<26s}: {learning_rate}')
 print(f'{"Batch size":<26s}: {batch_size}')
 print(f'{"Input size":<26s}: {input_size}')
 print(f'{"Data augmentation":<26s}: {data_augmentation} ')
+
+if model_configuration == 'VAE':
+    print(f'{"VAE latent space dimension":<26s}: {vae_latent_dim}')
+    print(f'{"VAE KL loss weight":<26s}: {vae_kl_weight}')
+
+if "ViT" in model_configuration:
+    print(f'{"ViT patch size":<26s}: {vit_patch_size}')
+    print(f'{"ViT projection dim.":<26s}: {vit_projection_dim}')
 
 
 ## get all file names, configure based on classification type and unique labels
@@ -179,7 +222,6 @@ classification types, here are the description:
     - 3 : Hashimoto
     - 4 : Graves
     - 5 : Cancer
-
 '''
 classification_type_dict = {}
 
@@ -249,7 +291,7 @@ if custom_classification:
         print('Running in debug mode - using less training data \n')
         random.seed(29)
         random.shuffle(file_names)
-        file_names = file_names[0:10000]
+        file_names = file_names[0:30000]
 else:
     if (classification_type == 'c1' or classification_type == 'c2' or classification_type == 'c3'):
         if os.path.isfile(train_test_split):
@@ -415,15 +457,15 @@ if imbalance_data_strategy == 'oversampling':
         print(f'Avoiding oversampling strategy since this will imply repeating one of the classes more that 3 times')
         print(f'Using class weights instead. Setting loss function to weighted categorical cross entropy (wcce)')
         imbalance_data_strategy = 'weights'
-        class_weights = class_weights.sum() / class_weights**1
-        # class_weights = class_weights / class_weights.sum()
+        # class_weights = class_weights.sum() / class_weights**1
+        class_weights = (1 / class_weights) * (class_weights.sum())
         loss = 'wcce'
 
 elif imbalance_data_strategy == 'weights':
     print(f'\nUsing {imbalance_data_strategy} strategy to handle imbalance data.')
     print(f'Setting loss function to wcce given the {imbalance_data_strategy} strategy')
-    class_weights = class_weights.sum() / class_weights**1
-    # class_weights = class_weights / class_weights.sum()
+    # class_weights = class_weights.sum() / class_weights**1
+    class_weights = (1 / class_weights) * (class_weights.sum())
     loss = 'wcce'
 
 elif imbalance_data_strategy == 'none':
