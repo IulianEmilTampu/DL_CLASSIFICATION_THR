@@ -52,10 +52,10 @@ debug = args.debug == 'True'
 max_epochs = int(args.epocs)
 patience = int(args.patience)
 
-# # # # # # # # # # # # # # # parse variables DEBUG
-# configuration_file = '/flush/iulta54/Research/P3-OCT_THR/trained_models/TEST_M4_c1_BatchNorm_dr0.3_lr0.00001_wcce_weights_batch4/config.json'
+# # # # # # # # # # # # # # # # parse variables DEBUG
+# configuration_file = '/flush/iulta54/Research/P3-OCT_THR/trained_models/TEST_ViT/config.json'
 # debug = True
-# max_epochs = 5
+# max_epochs = 1
 # patience = 5
 
 if not os.path.isfile(configuration_file):
@@ -201,6 +201,19 @@ for cv in range(config['N_FOLDS']):
                         kernel_size=config['kernel_size'],
                         input_size=config['input_size']
                         )
+    elif config['model_configuration'] == 'ViT':
+        model = models_tf.ViT(number_of_input_channels = 1,
+                        model_name=config['model_configuration'],
+                        num_classes = len(config['unique_labels']),
+                        data_augmentation=config['data_augmentation'],
+                        class_weights = config['class_weights'],
+                        input_size=config['input_size'],
+                        patch_size=config["vit_patch_size"],
+                        projection_dim=config["vit_projection_dim"],
+                        num_heads=config["vit_num_heads"],
+                        mlp_head_units=config["vit_mlp_head_units"],
+                        transformer_layers=config["vit_transformer_layers"],
+                        transformer_units=config["vit_transformer_units"])
     else:
         model = models_tf.LightOCT(number_of_input_channels = 1,
                         model_name='LightOCT',
@@ -217,7 +230,6 @@ for cv in range(config['N_FOLDS']):
     warm_up_epochs = 5
     warm_up_learning_rate = 0.00001
 
-
     if 'VAE' in config['model_configuration']:
         utilities_models_tf.train_VAE(model,
                         train_dataset, val_dataset,
@@ -225,13 +237,13 @@ for cv in range(config['N_FOLDS']):
                         unique_labels = config['unique_labels'],
                         loss=[config['loss']],
                         start_learning_rate = config['learning_rate'],
-                        scheduler = 'linear',
+                        scheduler = 'constant',
                         vae_kl_weight=config['vae_kl_weight'],
                         vae_reconst_weight=config['vae_reconst_weight'],
                         power = 0.1,
-                        max_epochs=500,
+                        max_epochs=max_epochs,
                         early_stopping=True,
-                        patience=20,
+                        patience=patience,
                         warm_up = warm_up,
                         warm_up_epochs = warm_up_epochs,
                         warm_up_learning_rate = warm_up_learning_rate,
@@ -246,11 +258,11 @@ for cv in range(config['N_FOLDS']):
                         unique_labels = config['unique_labels'],
                         loss=[config['loss']],
                         start_learning_rate = config['learning_rate'],
-                        scheduler = 'linear',
+                        scheduler = 'constant',
                         power = 0.1,
-                        max_epochs=500,
+                        max_epochs=max_epochs,
                         early_stopping=True,
-                        patience=20,
+                        patience=patience,
                         save_model_path=os.path.join(config['save_model_path'], 'fold_'+str(cv+1)),
                         save_model_architecture_figure=True if cv==0 else False,
                         warm_up = warm_up,

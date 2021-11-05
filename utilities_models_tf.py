@@ -395,6 +395,45 @@ def plotVAEreconstruction(original, reconstructed, epoch, save_path, display=Fal
         plt.close()
 
 
+
+def plotVAElatentSpace(y, x_latent_space, unique_labels, label_description, epoch, save_path, display=False):
+    '''
+    Utility that given the latent space representation of the data, plots the
+    data distribution in a 2D scatered plot where the 2 dimensions are identified
+    through PCA
+    '''
+    from sklearn.decomposition import PCA
+
+    '''
+    TO be implemented: handle the missing or incompatible inputs
+    '''
+
+    pca = PCA(n_components=2)
+    pca.fit(x_latent_space)
+    z_PCA = pca.transform(x_latent_space)
+
+    fig = plt.figure(1, figsize=(10, 10))
+    # plot all the different classes
+    for name, label in zip(label_description, [i for i, _ in enumerate(unique_labels)]):
+        plt.scatter(z_PCA[np.array(y)==label, 0],
+                    z_PCA[np.array(y)==label, 1],
+                    cmap=plt.cm.Dark2,
+                    edgecolor='k',
+                    label=name,
+                    alpha=0.7)
+    plt.legend(fontsize=15)
+
+    fig.savefig(os.path.join(save_path, 'latent_space_'+str(epoch+1)+'.pdf'),
+                    bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(save_path, 'latent_space_'+str(epoch+1)+'.png'),
+                    bbox_inches='tight', dpi = 100)
+
+    if display is True:
+        plt.show()
+    else:
+        plt.close()
+
+
 def tictoc(tic=0, toc=1):
     '''
     Returns a string and a dictionary that contains the number of days, hours, minutes and
@@ -467,18 +506,35 @@ def train(self, training_dataloader,
         self.best_f1 = 0.0
         n_wait = 0
 
-    classification_loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-    mse = tf.keras.losses.MeanSquaredError()
+    # set loss function based in the type of classification
+    if len(self.unique_labels) == 2:
+        # using binary cross entropy as loss function
+        classification_loss_object = tf.keras.losses.BinaryCrossentropy(
+                                from_logits=True,
+                                reduction=tf.keras.losses.Reduction.NONE)
+    else:
+        classification_loss_object = tf.keras.losses.CategoricalCrossentropy(
+                                reduction=tf.keras.losses.Reduction.NONE)
 
-    def classificationLoss(model, x, y, training):
+    def classificationLoss(model, x, y, training, class_weights=None):
         # training=training is needed only if there are layers with different
         # behavior during training versus inference (e.g. Dropout).
         y_= model(x, training=training)
-        return classification_loss_object(y_true=y, y_pred=y_)
+        classification_loss = classification_loss_object(
+                        y_true=to_categorical(y, num_classes=len(self.unique_labels)),
+                        y_pred=y_)
 
-    def grad(model, inputs, targets):
+        if class_weights:
+            per_sample_weights = tf.constant(class_weights, dtype=tf.float32)
+            # one weight for each sample [batch_size, 1]
+            per_sample_weights = tf.reduce_sum(per_sample_weights * to_categorical(y, num_classes=len(self.unique_labels)), axis=1)
+            classification_loss = classification_loss * per_sample_weights
+
+        return tf.reduce_sum(classification_loss, axis=-1)
+
+    def grad(model, inputs, targets, class_weights=None):
         with tf.GradientTape() as tape:
-            loss_value = classificationLoss(model, inputs, targets, training=True)
+            loss_value = classificationLoss(model, inputs, targets, training=True, class_weights=class_weights)
         return loss_value, tape.gradient(loss_value, model.trainable_variables)
 
     # Keep results for plotting
@@ -514,26 +570,31 @@ def train(self, training_dataloader,
             self.power = 1
         elif self.scheduler == 'polynomial':
             self.power = power
+        elif self.scheduler == 'constant':
+            self.power = 0
         else:
             raise TypeError('Invalid scheduler. given {} but expected linear or polynomial'.format(self.scheduler))
 
         # check if gradient warm-up is needed
         if warm_up is True and epoch < warm_up_epochs:
-            lr = (warm_up_learning_rate*epoch)/warm_up_epochs
-            self.learning_rate_history.append(lr)
+            lr = warm_up_learning_rate
         else:
             if warm_up is True:
-                # do not count the number of epochs used for warm_up
-                lr = leraningRateScheduler(self.initial_learning_rate, epoch-warm_up_epochs, self.maxEpochs, power)
+                 # do not count the number of epochs used for warm_up
+                 lr = leraningRateScheduler(self.initial_learning_rate, epoch-warm_up_epochs, self.maxEpochs, power)
             else:
-                lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
-            self.learning_rate_history.append(lr)
+                 lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
+
+        # save learning rate info
+        self.learning_rate_history.append(lr)
 
         # set optimizer - using ADAM by default
-        # optimizer = Adam(learning_rate=lr)
-        # optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
-        optimizer = tfa.optimizers.RectifiedAdam(learning_rate=lr)
+        optimizer = Adam(learning_rate=lr)
         optimizer = tfa.optimizers.Lookahead(optimizer=optimizer, sync_period=6, slow_step_size=0.5)
+
+        # # # # # # # FOR LightOCT MODEL
+        # self.learning_rate_history.append(self.initial_learning_rate)
+        # optimizer = tf.keras.optimizers.SGD(learning_rate=self.initial_learning_rate , momentum=0.9, nesterov=False, name='SGD')
 
         # ####### TRAINING
         step = 0
@@ -556,7 +617,7 @@ def train(self, training_dataloader,
             # sys.exit()
             # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
 
-            train_loss, grads = grad(self.model, x, y)
+            train_loss, grads = grad(self.model, x, y, self.class_weights)
 
             # # ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤
             # print(grads[-1])
@@ -612,7 +673,7 @@ def train(self, training_dataloader,
             # fix labels
             y = fix_labels_v2(y.numpy(), self.classification_type, self.unique_labels, categorical=False)
 
-            val_loss = classificationLoss(self.model, x, y, training=False)
+            val_loss = classificationLoss(self.model, x, y, training=False, class_weights=self.class_weights)
 
             # track progress
             val_epoch_loss_avg.update_state(val_loss)
@@ -706,7 +767,6 @@ def train(self, training_dataloader,
                     print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                 break
 
-
 ## TRAINING ROUTINE FOR VAE MODEL
 def train_VAE(self, training_dataloader,
                 validation_dataloader,
@@ -726,6 +786,7 @@ def train_VAE(self, training_dataloader,
                 warm_up_learning_rate=0.00001,
                 save_model_path=os.getcwd(),
                 save_model_architecture_figure=True,
+                label_description=None,
                 verbose=1):
 
     # define parameters useful to store training and validation information
@@ -740,6 +801,9 @@ def train_VAE(self, training_dataloader,
     self.vae_reconst_weight=vae_reconst_weight
     self.save_model_path=save_model_path
     self.unique_labels = unique_labels
+    self.label_description = label_description
+    if self.label_description is None:
+        self.label_description = [i for i,_ in enumerate(self.unique_labels)]
     self.classification_type = classification_type
     self.best_epoch = 0
 
@@ -900,6 +964,10 @@ def train_VAE(self, training_dataloader,
             self.num_training_samples = self.batch_size*step
 
         # ########### VALIDATION
+        # save 10 batches of validation images for the latent space representation
+        val_latent_space = tf.zeros([0, self.vae_latent_dim])
+        val_y_latent_space = []
+
         step = 0
         for x, y in validation_dataloader:
             step += 1
@@ -912,9 +980,16 @@ def train_VAE(self, training_dataloader,
             val_loss = c_loss + vae_loss
 
             # track progress
+            y_ = self.model(x, training=False)
+
             val_epoch_loss_avg.update_state(val_loss)
-            val_epoch_accuracy.update_state(y, self.model(x, training=False)[0])
+            val_epoch_accuracy.update_state(y, y_[0])
             val_epoch_f1.update_state(to_categorical(y, num_classes=self.num_classes), self.model(x, training=False)[0])
+
+            # save latent space representation
+            if step < 10:
+                val_latent_space = tf.concat([val_latent_space, y_[-1]], axis=0)
+                val_y_latent_space.extend(y.numpy().tolist())
 
             # print values
             if self.verbose == 2:
@@ -951,7 +1026,7 @@ def train_VAE(self, training_dataloader,
         if epoch == 0:
             self.num_validation_samples = self.batch_size*step
 
-        if epoch % 2 == 0:
+        if epoch % 1 == 0:
             # plotModelPerformance(self.train_loss_history,
             #                         self.train_accuracy_history,
             #                         self.val_loss_history,
@@ -971,8 +1046,15 @@ def train_VAE(self, training_dataloader,
 
             plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
 
-
             plotVAEreconstruction(self.model(x, training=False)[2].numpy(), self.model(x, training=False)[1].numpy(), epoch, self.save_model_path)
+
+            plotVAElatentSpace(val_y_latent_space,
+                               val_latent_space,
+                               self.unique_labels,
+                               self.label_description,
+                               epoch,
+                               self.save_model_path,
+                               display=False)
 
         if early_stopping:
             # check if model accurary improved, and update counter if needed
@@ -1138,8 +1220,8 @@ def save_model(self):
         'Dropout_rate': self.dropout_rate if hasattr(self, 'dropout_rate') else 'NaN',
         'Normalization': self.normalization if hasattr(self, 'normalization') else 'NaN',
         'Model_depth' : int(self.depth),
-        'Num_filter_start' : self.num_filter_start,
-        'Kernel_size' : list(self.kernel_size),
+        'Num_filter_start' : self.num_filter_start if hasattr(self, 'num_filter_start') else 'NaN',
+        'Kernel_size' : list(self.kernel_size) if hasattr(self, 'kernel_size') else 'NaN',
         'Num_training_samples' : int(self.num_training_samples),
         'nVALIDATION' :  int(self.num_validation_samples),
         'BATCH_SIZE' : int(self.batch_size),
@@ -1157,10 +1239,22 @@ def save_model(self):
         'VALIDATION_ACC_HISTORY':self.val_accuracy_history,
         'TRAIN_F1_HISTORY':self.train_f1_history,
         'VALIDATION_F1_HISTORY':self.val_f1_history,
-        'KL_LOSS_WEIGHT':self.vae_kl_weight if 'VAE' in self.model_name else None,
-        'RECONSTRUCTION_LOSS_WEIGHT':self.vae_reconst_weight if 'VAE' in self.model_name else None,
-        'VAE_LATENT_SPACE_DIM':self.vae_latent_dim if 'VAE' in self.model_name else None
         }
+    # add VAE parameters if VAE model
+    if  'VAE' in self.model_name:
+        model_summary['KL_LOSS_WEIGHT'] = self.vae_kl_weight
+        model_summary['RECONSTRUCTION_LOSS_WEIGHT'] = self.vae_reconst_weight
+        model_summary['VAE_LATENT_SPACE_DIM'] = self.vae_latent_dim
+
+    # add VAE parameters if ViT model
+    if  'ViT' in self.model_name:
+        model_summary['PATCH_SIZE'] = self.patch_size
+        model_summary['PROJECTION_DIM'] = self.projection_dim
+        model_summary['N_HEADS'] = self.num_heads
+        model_summary['MPL_UNITS'] = self.mlp_head_units
+        model_summary['TRANSFORMER_LAYERS'] = self.transformer_layers
+        model_summary['TRANSFORMER_UNITS'] = self.transformer_units
+
     # for key, value in model_summary.items():
     #     print(f'{key} - {type(value)}')
     with open(os.path.join(self.save_model_path, 'model_summary_json.txt'), 'w') as outfile:

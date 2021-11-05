@@ -120,24 +120,27 @@ if vit_transformer_units == None:
     vit_transformer_units = [vit_projection_dim * 2, vit_projection_dim]
 
 # # # # # # # # # # parse variables
-# working_folder = '/flush/iulta54/Research/P3-THR_DL/'
+# working_folder = '/flush/iulta54/Research/P3-OCT_THR/'
 # dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR'
-# train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split_rollback.json'
-# model_configuration = 'LightOCT'
-# model_save_name = 'TEST'
-# classification_type = 'c7'
-# custom_classification = True
-# loss = 'cce'
+# train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_isotropic_TFR/train_test_split.json'
+# model_configuration = 'ViT'
+# model_save_name = 'TEST_ViT'
+# classification_type = 'c1'
+# custom_classification = False
+# loss = 'wcce'
 # learning_rate = 0.0001
-# batch_size = 100
+# dropout_rate = 0.3
+# model_normalization = "BatchNorm"
+# batch_size = 64
 # input_size = [200, 200]
 # data_augmentation = True
-# N_FOLDS = 3
+# N_FOLDS = 1
 # verbose = 2
 # imbalance_data_strategy = 'weights'
 # kernel_size = [5,5]
-# debug = False
-
+# check_training = False
+# debug = True
+#
 # if "VAE" in model_configuration:
 #     vae_latent_dim = 128
 #     vae_kl_weight = 0.1
@@ -286,12 +289,7 @@ if custom_classification:
     # infere file extention from the dataset files
     _, extension = os.path.splitext(glob.glob(os.path.join(dataset_folder, '*'))[10])
     file_names = glob.glob(os.path.join(dataset_folder, '*'+extension))
-    # use less data in debug mode
-    if debug:
-        print('Running in debug mode - using less training data \n')
-        random.seed(29)
-        random.shuffle(file_names)
-        file_names = file_names[0:30000]
+
 else:
     if (classification_type == 'c1' or classification_type == 'c2' or classification_type == 'c3'):
         if os.path.isfile(train_test_split):
@@ -315,12 +313,6 @@ else:
                 train_val_filenames = [os.path.join(dataset_folder, f+extension) for f in train_val_filenames]
                 test_filenames = [os.path.join(dataset_folder, f+extension) for f in test_filenames]
 
-                # # debug modeaus = [os.path.basename(i[0:i.find('c1')-1]) for i in c]
-                # if debug:
-                #     print('Running in debug mode - using less training data (20000) \n')
-                #     # random.seed(29)
-                #     random.shuffle(train_val_filenames)
-                #     train_val_filenames = train_val_filenames[0:20000]
         else:
             raise ValueError(f'Using default classification type, but not train_test_split.json file found. Run the set_test_set.py first')
     else:
@@ -417,7 +409,7 @@ if debug:
     print('Running in debug mode - using less training/validation data (20000) \n')
     # random.seed(29)
     random.shuffle(train_val_filenames)
-    train_val_filenames = train_val_filenames[0:20000]
+    train_val_filenames = train_val_filenames[0:10000]
 
 train_val_filenames, train_val_labels, per_class_file_names = utilities.get_organized_files(train_val_filenames,
                     classification_type=classification_type,
@@ -633,11 +625,6 @@ json_dict['input_size'] = input_size
 json_dict['kernel_size'] = kernel_size
 json_dict['data_augmentation'] = data_augmentation
 
-
-json_dict['vae_latent_dim'] = vae_latent_dim
-json_dict['vae_kl_weight'] = vae_kl_weight
-json_dict['vae_reconst_weight'] = vae_reconst_weight
-
 json_dict['N_FOLDS'] = N_FOLDS
 json_dict['verbose'] = verbose
 json_dict['imbalance_data_strategy'] = imbalance_data_strategy
@@ -646,6 +633,22 @@ json_dict['training'] = per_fold_train_files
 json_dict['validation'] = per_fold_val_files
 json_dict['test'] = test_filenames
 json_dict['class_weights'] = list(class_weights)
+
+# save VAE configuration if VAE model
+if "VAE" in model_configuration:
+    json_dict['vae_latent_dim'] = vae_latent_dim
+    json_dict['vae_kl_weight'] = vae_kl_weight
+    json_dict['vae_reconst_weight'] = vae_reconst_weight
+
+
+# save ViT configuration if ViT model
+if "ViT" in model_configuration:
+    json_dict["vit_patch_size"]=vit_patch_size
+    json_dict["vit_projection_dim"]=vit_projection_dim
+    json_dict["vit_num_heads"]=vit_num_heads
+    json_dict["vit_mlp_head_units"]=vit_mlp_head_units
+    json_dict["vit_transformer_layers"]=vit_transformer_layers
+    json_dict["vit_transformer_units"]=vit_transformer_units
 
 # save file
 save_model_path = os.path.join(working_folder, 'trained_models', model_save_name)
