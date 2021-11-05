@@ -361,12 +361,12 @@ class M4(object):
         encoding_vector = GlobalMaxPooling2D()(x)
 
         # FCN
-        pred = Dropout(rate=dropout_rate)(encoding_vector)
-        pred = Dense(units=512, activation='relu')(pred)
-        pred = Dropout(rate=dropout_rate)(pred)
-        pred = Dense(units=128, activation='relu')(pred)
-        pred = Dropout(rate=dropout_rate)(pred)
-        pred = Dense(units=self.num_classes)(pred)
+        x = Dropout(rate=dropout_rate)(encoding_vector)
+        x = Dense(units=512, activation='relu')(x)
+        x = Dropout(rate=dropout_rate)(x)
+        x = Dense(units=128, activation='relu')(x)
+        x = Dropout(rate=dropout_rate)(x)
+        pred = Dense(units=self.num_classes, activation='softmax')(x)
 
         self.model = Model(inputs=inputs, outputs=pred, name=model_name)
 
