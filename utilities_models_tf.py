@@ -599,14 +599,13 @@ def train(self, training_dataloader,
         # save learning rate info
         self.learning_rate_history.append(lr)
 
-        # set optimizer - using ADAM by default
-        # optimizer = Adam(learning_rate=lr)
-        optimizer = tfa.optimizers.RectifiedAdam(learning_rate=lr)
-        optimizer = tfa.optimizers.Lookahead(optimizer=optimizer, sync_period=5, slow_step_size=0.5)
-
-        # # # # # # # FOR LightOCT MODEL
-        # self.learning_rate_history.append(self.initial_learning_rate)
-        # optimizer = tf.keras.optimizers.SGD(learning_rate=self.initial_learning_rate , momentum=0.9, nesterov=False, name='SGD')
+        if "LightOCT" in self.model_configuration:
+            optimizer = tf.keras.optimizers.SGD(learning_rate=self.initial_learning_rate , momentum=0.9, nesterov=False, name='SGD')
+        else:
+            # set optimizer - using ADAM by default
+            # optimizer = Adam(learning_rate=lr)
+            optimizer = tfa.optimizers.RectifiedAdam(learning_rate=lr)
+            optimizer = tfa.optimizers.Lookahead(optimizer=optimizer, sync_period=5, slow_step_size=0.5)
 
         # ####### TRAINING
         step = 0
