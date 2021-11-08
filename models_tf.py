@@ -1857,7 +1857,7 @@ class ViT(object):
         # Add MLP.
         features = mlp(representation, hidden_units=self.mlp_head_units, dropout_rate=0.5)
         # Classify outputs.
-        logits = layers.Dense(self.num_classes)(features)
+        logits = layers.Dense(self.num_classes, activation='softmax')(features)
         # Create the Keras model.
         self.model = Model(inputs=inputs, outputs=logits)
 
