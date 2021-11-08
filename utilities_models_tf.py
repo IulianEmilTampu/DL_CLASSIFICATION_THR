@@ -599,7 +599,7 @@ def train(self, training_dataloader,
         # save learning rate info
         self.learning_rate_history.append(lr)
 
-        if "LightOCT" in self.model_configuration:
+        if "LightOCT" in self.model_name:
             optimizer = tf.keras.optimizers.SGD(learning_rate=self.initial_learning_rate , momentum=0.9, nesterov=False, name='SGD')
         else:
             # set optimizer - using ADAM by default
