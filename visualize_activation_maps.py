@@ -49,20 +49,13 @@ args = vars(ap.parse_args())
 
 
 ## 1 load folders and information about the model
-trained_models_path = "/flush/iulta54/Research/P3-THR_DL/trained_models/"
-model_name= "M4_c7_BatchNorm_dr0.2_lr0.00001_wcce_weights_batch64"
-model_path = os.path.join(trained_models_path, model_name)
-save_path = os.path.join(model_path, 'Gard-Cam')
-# check if save_path exists if not, create it
-if not os.path.isdir(save_path):
-    os.mkdir(save_path)
-
 # get dataset info from the configuration file
 from_configuration_file = True
 
 if from_configuration_file:
-    model_name = os.path.basename(model_path)
-    trained_models_path = os.path.join(model_path,'trained_models')
+    model_name = 'ViT_c1_lr0.0001_pts16_prjd128_heads8_tlayers8_batch128'
+    trained_models_path = '/flush/iulta54/Research/P3-OCT_THR/trained_models'
+    model_path = os.path.join(trained_models_path, model_name)
     dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning'
 
     # load configuration file
@@ -73,7 +66,6 @@ if from_configuration_file:
     # make sure that the files point to this system dataset
     fold = 0
     test_img = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in config['test']]
-    # test_img.pop(test_img.index('/flush/iulta54/Research/Data/OCT/MunichData/TH_WF/13112012_0049997762_07.jpeg'))
     tr_img = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in config['training'][fold]]
     val_img = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in config['validation'][fold]]
 
@@ -92,16 +84,20 @@ else:
     # c_type='c1'
     # file_names, labels, organized_files = utilities.get_organized_files(file_names, c_type, categorical=False)
 
+# make folder where to save imaes
+save_path = os.path.join(trained_models_path, model_name,"GradCAM")
+pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+
 ## 2 create dataset we want to use for getting the images to inspect
 importlib.reload(utilities)
 importlib.reload(utilities_models_tf)
 
 seed = 29122009
-batch_size = 100
-images_to_show = 50
+batch_size = 50
+images_to_show = 10
 
 # check data coming out of the generators
-debug = True
+debug = False
 show = True
 model_to_check = 0
 
@@ -112,6 +108,7 @@ if debug is True:
                     buffer_size=5000,
                     crop_size=crop_size)
         x, y = next(iter(test_dataset_debug))
+        aus_y = y
         if show == True:
             y = utilities_models_tf.fix_labels_v2(y.numpy(), classification_type='c3', unique_labels=config['unique_labels'], categorical=False)
             sample = (x.numpy(), y.numpy())
@@ -121,7 +118,7 @@ if debug is True:
 test_dataset = utilities.TFR_2D_dataset(test_img,
                 dataset_type = 'train',
                 batch_size=batch_size,
-                buffer_size=1000,
+                buffer_size=10000,
                 crop_size=crop_size)
 
 ## 3 load model
@@ -158,7 +155,10 @@ for x, y in test_dataset:
         y_logits = y_logits[0]
     pred_logits = tf.concat([pred_logits, y_logits], axis=0)
     # save gt
-    labels = tf.concat([labels, utilities_models_tf.fix_labels_v2(y.numpy(), 'c3', config['unique_labels'])], axis=0)
+    labels = tf.concat([labels, utilities_models_tf.fix_labels_v2(y.numpy(),
+                config['classification_type'],
+                config['unique_labels'])],
+                axis=0)
 
     # stop is reached the number of images to show
     if pred_logits.numpy().shape[0] >= images_to_show:
@@ -186,29 +186,36 @@ if images.shape[0] % n_samples_per_image != 0:
 if debug is True:
     n_images = 1
 
-print('Looking for conv layers name...')
-name_layers = []
-for layer in model.layers:
-    if 'conv' in layer.name:
-        # in VAE there are transpose convolutions, we don't need those
-        if 'transpose' not in layer.name:
-            # since ResNet layers are all named convX_blockY_type(conv, bn, relu)
-            # here we check that we are only taking the actuall conv layers
-            if 'block' in layer.name:
-                # here we are looking at a block of layers, only take the conv one
-                if layer.name[-4::]=='conv':
+if "ViT" in config["model_configuration"]:
+    # get the last normalization layer
+    for layer in reversed(model.layers):
+        if "layer_normalization" in layer.name:
+            name_layers = [layer.name]
+            break
+else:
+    print('Looking for conv layers name...')
+    name_layers = []
+    for layer in model.layers:
+        if 'conv' in layer.name:
+            # in VAE there are transpose convolutions, we don't need those
+            if 'transpose' not in layer.name:
+                # since ResNet layers are all named convX_blockY_type(conv, bn, relu)
+                # here we check that we are only taking the actuall conv layers
+                if 'block' in layer.name:
+                    # here we are looking at a block of layers, only take the conv one
+                    if layer.name[-4::]=='conv':
+                        name_layers.append(layer.name)
+                elif 'conv2d' in layer.name:
+                    # here no conv blocks
                     name_layers.append(layer.name)
-            elif 'conv2d' in layer.name:
-                # here no conv blocks
-                name_layers.append(layer.name)
 
 print('Found {} layers -> {}'.format(len(name_layers), name_layers))
 
-# Whick layer to show. if None, all will be displayed. This is useful when
+## Whick layer to show. if None, all will be displayed. This is useful when
 # looking at large models with many layers
 
 conv_to_show = None
-conv_to_show = [-2,-1]
+# conv_to_show = [-4,-3,-2,-1]
 
 if conv_to_show is not None:
     name_layers = [name_layers[i] for i in conv_to_show]
@@ -225,7 +232,10 @@ for i in range(images.shape[0]):
     heatmap_raw.append([])
     heatmap_rgb.append([])
     for nl in name_layers:
-        cam = utilities.gradCAM(model, c, layerName=nl, debug=False)
+        if "ViT" in config["model_configuration"]:
+            cam = utilities.gradCAM(model, c, layerName=nl, ViT=True, debug=False)
+        else:
+            cam = utilities.gradCAM(model, c, layerName=nl, debug=False)
         aus_raw, aus_rgb = cam.compute_heatmap(image)
         heatmap_raw[i].append(aus_raw)
         heatmap_rgb[i].append(aus_rgb)
@@ -285,7 +295,6 @@ if save is not True:
     plt.show()
 
 ## 4.2 across class plots
-importlib.reload(GradCAM)
 '''
 Here for every image we plot the activation map for every class.
 '''
@@ -294,18 +303,22 @@ save = True
 debug = False
 
 # get all the needed heatmaps
-layer_name = name_layers[2]
+layer_name = name_layers[-1]
 heatmap_raw = []
 heatmap_rgb = []
 
-print('Computing activation maps for each class...')
+
 for i in range(images.shape[0]):
+    print(f'Computing activation maps for each class {i:3d}/{images.shape[0]:3d} \r', end='')
     image = np.expand_dims(images[i], axis=0)
     # for all the images, compute heatmap for all the classes
     heatmap_raw.append([])
     heatmap_rgb.append([])
-    for j in range(len(unique_labels)):
-        cam = utilities.gradCAM(model, j, layerName=layer_name, debug=False)
+    for j in range(len(config["unique_labels"])):
+        if "ViT" in config["model_configuration"]:
+            cam = utilities.gradCAM(model, j, layerName=nl, ViT=True, debug=False)
+        else:
+            cam = utilities.gradCAM(model, j, layerName=nl, debug=False)
         aus_raw, aus_rgb = cam.compute_heatmap(image)
         heatmap_raw[i].append(aus_raw)
         heatmap_rgb[i].append(aus_rgb)

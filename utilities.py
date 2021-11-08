@@ -762,7 +762,7 @@ Grad-CAM implementation [1] as described in post available at [2].
 '''
 
 class gradCAM:
-    def __init__(self, model, classIdx, layerName=None, use_image_prediction=True, debug=False):
+    def __init__(self, model, classIdx, layerName=None, use_image_prediction=True, ViT=False, debug=False):
         '''
         model: model to inspect
         classIdx: index of the class to ispect
@@ -773,6 +773,7 @@ class gradCAM:
         self.layerName = layerName
         self.debug = debug
         self.use_image_prediction = use_image_prediction
+        self.is_ViT = ViT
 
         # if the layerName is not provided, find the last conv layer in the model
         if self.layerName is None:
@@ -876,8 +877,14 @@ class gradCAM:
 
         # now that we have the astivation map for the specific layer, we need
         # to resize it to be the same as the input image
-        (w, h) = (image.shape[2], image.shape[1])
-        heatmap = cv2.resize(cam.numpy(),(w, h))
+        if self.is_ViT:
+            dim = int(np.sqrt(cam.shape[0]))
+            (w, h) = (image.shape[2], image.shape[1])
+            heatmap = cam.numpy().reshape((dim, dim))
+            heatmap = cv2.resize(heatmap,(w, h))
+        else:
+            (w, h) = (image.shape[2], image.shape[1])
+            heatmap = cv2.resize(cam.numpy(),(w, h))
 
         # normalize teh heat map in [0,1] and rescale to [0, 255]
         numer = heatmap - np.min(heatmap)
