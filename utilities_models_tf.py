@@ -587,12 +587,12 @@ def train(self, training_dataloader,
                                     epoch-warm_up_epochs,
                                     self.maxEpochs,
                                     power,
-                                    constant=True if self.schedule=="constant" else False)
+                                    constant=True if self.scheduler=="constant" else False)
             else:
                 lr = leraningRateScheduler(self.initial_learning_rate,
                                     epoch,
                                     self.maxEpochs,
-                                    constant=True if self.schedule=="constant" else False)
+                                    constant=True if self.scheduler=="constant" else False)
 
 
         # save learning rate info
