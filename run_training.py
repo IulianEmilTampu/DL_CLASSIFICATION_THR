@@ -215,18 +215,12 @@ for cv in range(config['N_FOLDS']):
                         transformer_layers=config["vit_transformer_layers"],
                         transformer_units=config["vit_transformer_units"])
     else:
-        model = models_tf.LightOCT(number_of_input_channels = 1,
-                        model_name='LightOCT',
-                        num_classes = len(config['unique_labels']),
-                        data_augmentation=config['data_augmentation'],
-                        class_weights = config['class_weights'],
-                        kernel_size=config['kernel_size'],
-                        input_size=config['input_size'],
-                        )
+        raise ValueError('Specified model configuration not available. Provide one that is implemented in models_tf.py')
+        sys.exit()
 
     # train model
     print(' - Training fold...')
-    warm_up = True,
+    warm_up = False,
     warm_up_epochs = 5
     warm_up_learning_rate = 0.00001
 

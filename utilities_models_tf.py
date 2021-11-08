@@ -172,7 +172,7 @@ def fix_labels_v2(labels, classification_type, unique_labels, categorical=True):
         return tf.convert_to_tensor(labels, dtype=tf.float32)
 
 
-def leraningRateScheduler(lr_start, current_epoch, max_epochs, power):
+def leraningRateScheduler(lr_start, current_epoch, max_epochs, power, constant=None):
     '''
     Implements a polynimial leraning rate decay based on the:
     - lr_start: initial learning rate
@@ -180,9 +180,11 @@ def leraningRateScheduler(lr_start, current_epoch, max_epochs, power):
     - max_epochs: max epochs
     - power: polynomial power
     '''
-
-    decay = (1 - (current_epoch / float(max_epochs))) ** power
-    return lr_start * decay
+    if not constant:
+        decay = (1 - (current_epoch / float(max_epochs))) ** power
+        return lr_start * decay
+    else:
+        return lr_start
 
 
 def accuracy(y_true, y_pred):
@@ -580,17 +582,26 @@ def train(self, training_dataloader,
             lr = warm_up_learning_rate
         else:
             if warm_up is True:
-                 # do not count the number of epochs used for warm_up
-                 lr = leraningRateScheduler(self.initial_learning_rate, epoch-warm_up_epochs, self.maxEpochs, power)
+                # do not count the number of epochs used for warm_up
+                lr = leraningRateScheduler(self.initial_learning_rate,
+                                    epoch-warm_up_epochs,
+                                    self.maxEpochs,
+                                    power,
+                                    constant=True if self.schedule=="constant" else False)
             else:
-                 lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
+                lr = leraningRateScheduler(self.initial_learning_rate,
+                                    epoch,
+                                    self.maxEpochs,
+                                    constant=True if self.schedule=="constant" else False)
+
 
         # save learning rate info
         self.learning_rate_history.append(lr)
 
         # set optimizer - using ADAM by default
-        optimizer = Adam(learning_rate=lr)
-        optimizer = tfa.optimizers.Lookahead(optimizer=optimizer, sync_period=6, slow_step_size=0.5)
+        # optimizer = Adam(learning_rate=lr)
+        optimizer = tfa.optimizers.RectifiedAdam(learning_rate=lr)
+        optimizer = tfa.optimizers.Lookahead(optimizer=optimizer, sync_period=5, slow_step_size=0.5)
 
         # # # # # # # FOR LightOCT MODEL
         # self.learning_rate_history.append(self.initial_learning_rate)
@@ -902,9 +913,15 @@ def train_VAE(self, training_dataloader,
         else:
             if warm_up is True:
                 # do not count the number of epochs used for warm_up
-                lr = leraningRateScheduler(self.initial_learning_rate, epoch-warm_up_epochs, self.maxEpochs, power)
+                lr = leraningRateScheduler(self.initial_learning_rate,
+                            epoch-warm_up_epochs,
+                            self.maxEpochs,
+                            power)
             else:
-                lr = leraningRateScheduler(self.initial_learning_rate, epoch, self.maxEpochs, power)
+                lr = leraningRateScheduler(self.initial_learning_rate,
+                            epoch,
+                            self.maxEpochs,
+                            power)
             self.learning_rate_history.append(lr)
 
         # set optimizer - using ADAM by default
