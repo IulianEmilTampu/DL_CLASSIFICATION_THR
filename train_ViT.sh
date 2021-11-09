@@ -75,6 +75,6 @@ declare -a vit_transformer_layers=2
 
 
 save_model_name=testOverFit_"$model_configuration"_"$classification_type"_lr"$lr"_pts"$vit_patch_size"_prjd"$vit_projection_dim"_batch"$batchSize"
-python3 -u configure_training.py -wd $working_folder -df $dataset_folder/2D_isotropic_TFR -tts $dataset_folder/2D_isotropic_TFR/train_test_split.json -mc $model_configuration -norm $normalization -dr $dropout_rate -mn $save_model_name -b $batchSize -ct $classification_type -cct $custom_classification -f $nFolds -l $loss -lr $lr -is 200 200 -vit_ps $vit_patch_size -vit_pd $vit_projection_dim -vit_nh $vit_num_heads -vit_mhu 2048 1024 -vit_tl $vit_transformer_layers -v 2 -db True |& tee $log_folder/$save_model_name.log
+python3 -u configure_training.py -wd $working_folder -df $dataset_folder/2D_isotropic_TFR -tts $dataset_folder/2D_isotropic_TFR/train_test_split.json -mc $model_configuration -norm $normalization -dr $dropout_rate -mn $save_model_name -b $batchSize -ct $classification_type -cct $custom_classification -f $nFolds -l $loss -lr $lr -is 200 200 -vit_ps $vit_patch_size -vit_pd $vit_projection_dim -vit_nh $vit_num_heads -vit_mhu 2048 1024 -vit_tl $vit_transformer_layers -v 2 -db False |& tee $log_folder/$save_model_name.log
 
 python3 -u run_training.py -cf $working_folder/trained_models/$save_model_name/config.json -db False -e 500 -p 100 |& tee -a $log_folder/$save_model_name.log
