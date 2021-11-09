@@ -93,10 +93,18 @@ class RandomBrightness(base_layer.Layer):
 #             name='Augmentation')
 #     return aug(inputs)
 
+# def augmentor(inputs):
+#     aug = tf.keras.Sequential([
+#             layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+#             layers.experimental.preprocessing.RandomRotation(0.02)],
+#             name='Augmentation')
+#     return aug(inputs)
+
 def augmentor(inputs):
     aug = tf.keras.Sequential([
             layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
-            layers.experimental.preprocessing.RandomRotation(0.02)],
+            layers.RandomZoom(height_factor=(-0.1,0.1), width_factor=None, fill_mode='constant',fill_value=4),
+            layers.experimental.preprocessing.RandomRotation(factor=0.05,fill_mode="constant", fill_value=4)],
             name='Augmentation')
     return aug(inputs)
 
@@ -776,6 +784,9 @@ def train(self, training_dataloader,
             if n_wait == patience:
                 if self.verbose == 1 or self.verbose == 2:
                     print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
+                    # saving last model as well
+                    self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
+                    self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
                 break
 
 ## TRAINING ROUTINE FOR VAE MODEL

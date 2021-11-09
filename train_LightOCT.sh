@@ -53,10 +53,10 @@ log_folder=$working_folder/trained_models_log
 #  # ################################ TESTING M4 ################################
 #  # ############################################################################
 
-declare -a classification_type=c1
-declare -a custom_classification=False
+declare -a classification_type=c4
+declare -a custom_classification=True
 
-declare -a model_configuration=M4
+declare -a model_configuration=LightOCT
 
 declare -a normalization=BatchNorm
 declare -a dropout_rate=0.3
@@ -68,7 +68,7 @@ declare -a nFolds=1
 
 
 save_model_name=testOverFit_"$model_configuration"_"$classification_type"_"$normalization"_dr"$dropout_rate"_lr"$lr"_wcce_"$ids"_batch"$batchSize"
-python3 -u configure_training.py -wd $working_folder -df $dataset_folder/2D_isotropic_TFR -tts $dataset_folder/2D_isotropic_TFR/train_test_split.json -mc $model_configuration -norm $normalization -dr $dropout_rate -mn $save_model_name -b $batchSize -ct $classification_type -cct $custom_classification -f $nFolds -l $loss -lr $lr -ks 5 5 -is 200 200 -ids $ids -v 2 -ctd False -db True |& tee $log_folder/$save_model_name.log
+python3 -u configure_training.py -wd $working_folder -df $dataset_folder/2D_isotropic_TFR -tts $dataset_folder/2D_isotropic_TFR/train_test_split.json -mc $model_configuration -norm $normalization -dr $dropout_rate -mn $save_model_name -b $batchSize -ct $classification_type -cct $custom_classification -f $nFolds -l $loss -lr $lr -ks 5 5 -is 200 200 -ids $ids -v 2 -ctd False -db False |& tee $log_folder/$save_model_name.log
 
 python3 -u run_training.py -cf $working_folder/trained_models/$save_model_name/config.json -e 500 -p 100 -db False |& tee -a $log_folder/$save_model_name.log
 
