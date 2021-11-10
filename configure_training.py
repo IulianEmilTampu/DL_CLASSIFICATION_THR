@@ -231,54 +231,66 @@ classification_type_dict = {}
 classification_type_dict['c1'] = {}
 classification_type_dict['c1']['unique_labels'] = [0,1]
 classification_type_dict['c1']['class_labels'] = ['normal', 'abnormal']
+classification_type_dict['c1']['filter_by'] = ["c1"]
 
 
 classification_type_dict['c2'] = {}
 classification_type_dict['c2']['unique_labels'] = [0,1,2,3]
 classification_type_dict['c2']['class_labels'] = ['normal', 'enlarged', 'shrunk', 'depleted']
+classification_type_dict['c2']['filter_by'] = ["c2"]
 
 classification_type_dict['c3'] = {}
 classification_type_dict['c3']['unique_labels'] = [0,1,2,3,4,5]
 classification_type_dict['c3']['class_labels'] = ['normal', 'Goiter', 'Adenoma', 'Hashimoto', 'Graves', 'Cancer']
+classification_type_dict['c3']['filter_by'] = ["c3"]
 
 # normal vs shrunk-depleted
 classification_type_dict['c4'] = {}
 classification_type_dict['c4']['unique_labels'] = [0,[2, 3, 4, 5]]
 classification_type_dict['c4']['class_labels'] = ['normal', 'shrunk-depleted']
+classification_type_dict['c4']['filter_by'] = ["c2", "c3"]
 
 # normal vs enlarged
 classification_type_dict['c5'] = {}
 classification_type_dict['c5']['unique_labels'] = [0,1]
 classification_type_dict['c5']['class_labels'] = ['normal', 'enlarged']
+classification_type_dict['c5']['filter_by'] = ["c2", "c3"]
 
 # enlarged vs shrunk-depleted
 classification_type_dict['c6'] = {}
 classification_type_dict['c6']['unique_labels'] = [1, [2, 3, 4, 5]]
 classification_type_dict['c6']['class_labels'] = ['enlarged', 'shrunk-depleted']
+classification_type_dict['c6']['filter_by'] = ["c2", "c3"]
 
 classification_type_dict['c7'] = {}
 classification_type_dict['c7']['unique_labels'] = [0, 2, 3, 4, 5]
 classification_type_dict['c7']['class_labels'] = ['normal', 'Adenoma', 'Hashimoto', 'Graves', 'Cancer']
+classification_type_dict['c7']['filter_by'] = ["c2", "c3"]
 
 classification_type_dict['c8'] = {}
 classification_type_dict['c8']['unique_labels'] = [0, 2]
 classification_type_dict['c8']['class_labels'] = ['normal', 'Adenoma']
+classification_type_dict['c8']['filter_by'] = ["c2", "c3"]
 
 classification_type_dict['c9'] = {}
 classification_type_dict['c9']['unique_labels'] = [2, 3, 4, 5]
 classification_type_dict['c9']['class_labels'] = ['Adenoma', 'Hashimoto', 'Graves', 'Cancer']
+classification_type_dict['c9']['filter_by'] = ["c2", "c3"]
 
 classification_type_dict['c10'] = {}
 classification_type_dict['c10']['unique_labels'] = [0, 3]
 classification_type_dict['c10']['class_labels'] = ['normal', 'Hashimoto']
+classification_type_dict['c10']['filter_by'] = ["c2", "c3"]
 
 classification_type_dict['c11'] = {}
 classification_type_dict['c11']['unique_labels'] = [0, 4]
 classification_type_dict['c11']['class_labels'] = ['normal', 'Graves']
+classification_type_dict['c11']['filter_by'] = ["c2", "c3"]
 
 classification_type_dict['c12'] = {}
 classification_type_dict['c12']['unique_labels'] = [0, 5]
 classification_type_dict['c12']['class_labels'] = ['normal', 'Cancer']
+classification_type_dict['c12']['filter_by'] = ["c2", "c3"]
 
 # check if we are using a default classification type. If yes, use the train_test_split.json file
 
@@ -339,10 +351,18 @@ if custom_classification:
     '''
 
     # get all files organized based on the more detailed classification (per disease)
+    # set also a filteer for files exclusion besed on the default classifications.
+    # By default excluding using the more detailed classification (per disease),
+    # but one can be more restrictive and filter out by c1 (normal-vs-diseased)
+    # or c2 (normal-enlarged-shrunk-depleted).
+    # If only filtering on the last one, there might be cases where samples are
+    # set as, for example, shrunk because belonging to graves but they have
+    # large sparse follicles (c2 = 9)
     file_names, labels, per_class_file_names = utilities.get_organized_files(file_names,
                         classification_type=classification_type,
                         custom=True,
-                        custom_labels=[0,1,2,3,4,5])
+                        custom_labels=[0,1,2,3,4,5],
+                        filter_by = classification_type_dict[classification_type]["filter_by"])
 
     # 1
     per_class_unique_volumes = []
@@ -372,8 +392,8 @@ if custom_classification:
             idx += 1
 
     # untill now we have files from every disease and for the normal samples all separated.
-    # Now cluster based on the classification_type setting. Use the same number of images
-    # from every disease/normal in case of them being set to the same class.
+    # Now cluster based on the classification_type setting. Take an equal number
+    # of images from every class in case these are gouped together.
 
     # 4
     test_filenames = []
@@ -414,7 +434,8 @@ if debug:
 train_val_filenames, train_val_labels, per_class_file_names = utilities.get_organized_files(train_val_filenames,
                     classification_type=classification_type,
                     custom= not (classification_type == 'c1' or classification_type == 'c2' or classification_type == 'c3'),
-                    custom_labels=classification_type_dict[classification_type]['unique_labels'])
+                    custom_labels=classification_type_dict[classification_type]['unique_labels'],
+                    filter_by = classification_type_dict[classification_type]["filter_by"])
 
 class_weights = np.array([len(i) for i in per_class_file_names])
 if imbalance_data_strategy == 'oversampling':

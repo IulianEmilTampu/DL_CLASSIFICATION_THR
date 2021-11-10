@@ -105,7 +105,8 @@ def get_organized_files(file_names, classification_type,
                         return_labels=True,
                         categorical=False,
                         custom=False,
-                        custom_labels=None):
+                        custom_labels=None,
+                        filter_by=("c3")):
     '''
     Utility that given a list of file names using the convention described in
     the create_dataset_v2.py script, returns three things:
@@ -135,6 +136,11 @@ def get_organized_files(file_names, classification_type,
         [2, 4, 5],
         6
         ]
+    filter_by : tuple
+        Specifies which of the three classification types to use for fitering
+        out files if they can not be classified. For example, by setting
+        filter_by = ("c1", "c3") files that have 9 in c1 or c3 position will
+        be excluded.
 
     will return categorical labels where labels are 0, 1, 2 and 3 with:
         - 0 having images from class 0;
@@ -178,13 +184,17 @@ def get_organized_files(file_names, classification_type,
             raise ValueError('custom was set to True, but no custom_labels specification was given.')
 
     # get labels for the specified classification type and exclude label 9
-    # (flags volumes to not be used)
+    # using the filter_by
     raw_labels = []
     filtered_file_names = []
     for file in file_names:
-        label = int(file[file.find(classification_type)+3])
-        if label != 9:
-            raw_labels.append(label)
+        # get all labels
+        label = {"c1":int(file[file.find("c1")+3]),
+                 "c2":int(file[file.find("c2")+3]),
+                 "c3":int(file[file.find("c3")+3])}
+        # use this file if it survives filtering
+        if all([label[c]!=9 for c in filter_by]):
+            raw_labels.append(label[classification_type])
             filtered_file_names.append(file)
 
     # use custom aggregation
@@ -265,11 +275,6 @@ def _parse_function_2D(proto, crop_size):
 
   return tf.squeeze(image, axis=0), [c1, c2, c3]
 
-def preprocess_augment(dataset):
-    image, label = dataset[0], dataset[1]
-    image = tf.image.random_flip_left_right(image)
-    image = tf.image.random_flip_up_down(image)
-    return image, label
 
 '''
 uset the above to create the dataset
@@ -288,15 +293,31 @@ def TFR_2D_dataset(filepath, dataset_type, batch_size, buffer_size=100, crop_siz
     # set bach_size
     dataset = dataset.batch(batch_size=batch_size)
 
-    # # augmentation
-    # if dataset_type == 'train':
-    #     dataset = dataset.map(lambda x: preprocess_augment(),
-    #             num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    # prefetch batches
+    dataset = dataset.prefetch(100)
+
+    return dataset
+
+def TFR_2D_dataset_withStringName(filepath, dataset_type, batch_size, buffer_size=100, crop_size=(200, 200), classification_type=None, unique_labels=None):
+    # point to the files of the dataset
+    dataset = tf.data.TFRecordDataset(filepath)
+    str_name = [os.path.basename(i) for i in filepath]
+    # parse sample
+    dataset = dataset.map(lambda x: (_parse_function_2D(x, crop_size=crop_size), str_name),
+                num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    # shuffle the training dataset
+    if dataset_type == 'train':
+        dataset = dataset.shuffle(buffer_size=buffer_size)
+
+    # set bach_size
+    dataset = dataset.batch(batch_size=batch_size)
 
     # prefetch batches
     dataset = dataset.prefetch(100)
 
     return dataset
+
 
 
 ## METRICS
