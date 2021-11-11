@@ -112,7 +112,7 @@ def get_organized_files(file_names, classification_type,
     the create_dataset_v2.py script, returns three things:
     1 - list of files that does not contain the file marked as to be excluded (9)
     2 - list of labels corresponding to the files above (categprical or not)
-    3 - a list of lists that contains the files organised per aggregation class
+    3 - a dictionary of lists that contains the files organised per aggregation class
 
     Parameters
     ----------
@@ -199,18 +199,21 @@ def get_organized_files(file_names, classification_type,
 
     # use custom aggregation
     final_file_names = []
-    organized_files = [[] for i in range(len(custom_labels))]
+    organized_files = {}
+    # create space in the dictionary for this cluster of labels
+    for idx, _ in enumerate(custom_labels):
+        organized_files[str(idx)] = {"file_names":[]}
     labels = []
     for f, c in zip(filtered_file_names, raw_labels):
         for idx, l in enumerate(custom_labels):
             if type(l) is list:
                 for ll in l:
                     if c == ll:
-                        organized_files[idx].append(f)
+                        organized_files[str(idx)]["file_names"].append(f)
                         labels.append(idx)
                         final_file_names.append(f)
             elif c == l:
-                organized_files[idx].append(f)
+                organized_files[str(idx)]["file_names"].append(f)
                 labels.append(idx)
                 final_file_names.append(f)
 
