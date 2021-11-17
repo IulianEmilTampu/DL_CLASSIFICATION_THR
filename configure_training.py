@@ -292,6 +292,11 @@ classification_type_dict['c12']['unique_labels'] = [0, 5]
 classification_type_dict['c12']['class_labels'] = ['normal', 'Cancer']
 classification_type_dict['c12']['filter_by'] = ["c2", "c3"]
 
+classification_type_dict['c13'] = {}
+classification_type_dict['c13']['unique_labels'] = [0, 1, [2,3,4,5]]
+classification_type_dict['c13']['class_labels'] = ['normal', 'enlarged', 'shrunk-depleted']
+classification_type_dict['c13']['filter_by'] = ["c2", "c3"]
+
 # check if we are using a default classification type. If yes, use the train_test_split.json file
 
 if custom_classification:
