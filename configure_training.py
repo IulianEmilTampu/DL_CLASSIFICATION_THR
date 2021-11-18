@@ -58,6 +58,7 @@ parser.add_argument('-l', '--loss', required=False, help='Loss to use to train t
 parser.add_argument('-lr', '--learning_rate', required=False, help='Learning rate.', default=0.001)
 parser.add_argument('-bs', '--batch_size', required=False, help='Batch size.', default=50)
 parser.add_argument('-is', '--input_size', nargs='+', required=False, help='Model input size.', default=(200,200))
+parser.add_argument('-3d', '--sparse_3d_dataset', required=False, help='If the training dataset is 2D images (False) or 3D sparse volume (True)', default=False)
 parser.add_argument('-ks', '--kernel_size', nargs='+', required=False, help='Encoder conv kernel size.', default=(5,5))
 parser.add_argument('-augment', '--augmentation', required=False, help='Specify if data augmentation is to be performed (True) or not (False)', default=True)
 parser.add_argument('-v', '--verbose',required=False, help='How much to information to print while training: 0 = none, 1 = at the end of an epoch, 2 = detailed progression withing the epoch.', default=0.1)
@@ -95,6 +96,7 @@ loss = args.loss
 learning_rate = float(args.learning_rate)
 batch_size = int(args.batch_size)
 input_size = [int(i) for i in args.input_size]
+sparse_3d_dataset =  args.sparse_3d_dataset == 'True'
 data_augmentation = args.augmentation
 N_FOLDS = int(args.folds)
 verbose = int(args.verbose)
@@ -189,6 +191,7 @@ else:
 print(f'{"Working directory":<26s}: {working_folder}')
 print(f'{"Model configuration":<26s}: {model_configuration}')
 print(f'{"Model save name":<26s}: {model_save_name}')
+print(f'{"Sparse 3D dataset":<26s}: {sparse_3d_dataset}')
 print(f'{"Classification type":<26s}: {classification_type}')
 print(f'{"Custom classification":<26s}: {custom_classification}')
 print(f'{"Loss function":<26s}: {loss}')
@@ -327,7 +330,7 @@ else:
                 # append basefolder and extention to the files
                 # infere file extention from the dataset files
                 _, extension = os.path.splitext(glob.glob(os.path.join(dataset_folder, '*'))[10])
-                train_val_filenames = [os.path.join(dataset_folder, f+extension) for f in train_val_filenames]
+                train_val_filenames = [os.path.join(dataset_folder, f+extension) for f3D in train_val_filenames]
                 test_filenames = [os.path.join(dataset_folder, f+extension) for f in test_filenames]
 
         else:
@@ -359,7 +362,7 @@ if custom_classification:
     # Set also a filter for files exclusion besed on the default classifications.
     # By default excluding using the more detailed classification (per disease),
     # but one can be more restrictive and filter out by c1 (normal-vs-diseased)
-    # and c2 (normal-enlarged-shrunk-depleted).
+    # and c2 (normal-enlarged-shrunk-depleted).3D
     # If only filtering on c3, there might be cases where samples are
     # set as, for example, shrunk because belonging to graves but they have
     # large sparse follicles (c2 = 9)
@@ -650,6 +653,7 @@ print(f'\nSavingconfiguration file...')
 json_dict = OrderedDict()
 json_dict['working_folder'] = working_folder
 json_dict['dataset_folder'] = dataset_folder
+json_dict['sparse_3d_dataset'] = sparse_3d_dataset
 
 json_dict['classification_type'] = classification_type
 json_dict['unique_labels'] = classification_type_dict[classification_type]['unique_labels']
