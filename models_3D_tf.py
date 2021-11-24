@@ -54,7 +54,7 @@ class Sparse_volume_compressor(layers.Layer):
 class LightOCT_3D(object):
     def __init__(self, num_classes,
                     num_channels=1,
-                    input_size=(None, None, None)
+                    input_size=(None, None, None),
                     data_augmentation=True,
                     normalizer=None,
                     class_weights=None,
@@ -123,3 +123,156 @@ class LightOCT_3D(object):
         if self.debug is True:
             print(self.model.summary())
 
+## ViT model working
+class ViT_3D(object):
+    def __init__(self, num_image_in_sequence,
+                num_classes,
+                input_size,
+                patch_size,
+                projection_dim=64,
+                num_heads=4,
+                mlp_head_units=(2048,1024),
+                transformer_layers=8,
+                transformer_units=None,
+                data_augmentation=True,
+                class_weights=None,
+                model_name='ViT',
+                debug=False):
+
+        self.num_image_in_sequence = num_image_in_sequence
+        self.num_classes = num_classes
+        self.input_size = input_size
+        self.debug = debug
+        if class_weights is None:
+            self.class_weights = np.ones([1, self.num_classes])
+        else:
+            self.class_weights = class_weights
+        self.model_name = model_name
+        self.custom_model = True
+
+        # ViT parameters
+        self.patch_size = patch_size
+        self.num_patches = (self.input_size[0] // self.patch_size) * (self.input_size[1] // self.patch_size)
+        self.projection_dim = projection_dim
+        self.num_heads = num_heads
+        self.mlp_head_units = mlp_head_units
+        self.transformer_layers = transformer_layers
+        self.depth = self.transformer_layers
+        if not transformer_units:
+            self.transformer_units = [selfprojection_dim * 2, self.projection_dim]
+        else:
+            self.transformer_units = transformer_units
+
+        # DEFINE BUILDING BLOCKS
+        # ################ MLP (the classifier)
+        def mlp(x, hidden_units, dropout_rate):
+            for units in hidden_units:
+                x = layers.Dense(units, activation=tf.nn.gelu)(x)
+                x = layers.Dropout(dropout_rate)(x)
+            return x
+
+        # ################# PATCH EXTRACTION
+        class PatchesFromSparseVolume(layers.Layer):
+            def __init__(self, patch_size):
+                super(PatchesFromSparseVolume, self).__init__()
+                self.patch_size = patch_size
+
+            def call(self, sparse_volume):
+                batch_size = tf.shape(sparse_volume)[0]
+                sequense_length = sparse_volume.shape[-1]
+                patches = tf.image.extract_patches(
+                    images=sparse_volume,
+                    sizes=[1, self.patch_size, self.patch_size, 1],
+                    strides=[1, self.patch_size, self.patch_size, 1],
+                    rates=[1, 1, 1, 1],
+                    padding="VALID",
+                ) # [batch, n_patch_row, n_patch_col, patch_dim**2*n_img_in_sequence]
+                flattened_patch_dims = self.patch_size**2
+                n_patches = patches.shape[1]*patches.shape[2]
+                # bring to # [batch, n_patch_per_img, patch_dim**2, n_img_in_sequence]
+                patches_reshaped =  tf.reshape(patches, [batch_size, n_patches, flattened_patch_dims,sequense_length])
+                # bring to shape [batch, n_patch_per_img, n_img_in_sequence, flatten_dim]
+                return tf.transpose(patches_reshaped, perm=(0,1,3,2))
+
+        # ################  PATCH ENCODING LAYER
+        class SparceVolumePatchEncoder(layers.Layer):
+            def __init__(self, num_patches_per_img, img_sequence_length, projection_dim):
+                super(SparceVolumePatchEncoder, self).__init__()
+                self.num_patches_per_img = num_patches_per_img
+                self.img_sequence_length = img_sequence_length
+                self.projection_dim = projection_dim
+                self.projection = layers.Dense(units=projection_dim)
+                self.img_embedding = layers.Embedding(
+                    input_dim=self.num_patches_per_img, output_dim=projection_dim
+                )
+                self.sequence_embedding = layers.Embedding(
+                    input_dim=self.img_sequence_length, output_dim=projection_dim
+                )
+
+            def call(self, patches):
+                batch_size = tf.shape(patches)[0]
+                '''
+                Expecting input to have shape
+                [batch, n_patches_per_img, n_img_sequense, project_dim]
+                '''
+                in_img_positions = tf.range(start=0, limit=self.num_patches_per_img, delta=1)
+                in_sequence_positions = tf.range(start=0, limit=self.img_sequence_length, delta=1)
+
+                '''
+                embed image in sequence position
+                [batch, n_patches_per_img, n_img_sequense, project_dim] + [n_img_sequense, project_dim]
+                '''
+                encoded = self.projection(patches) + self.sequence_embedding(in_sequence_positions)
+                '''
+                embed in image position
+                [batch, n_img_sequense, n_patches_per_img, project_dim] + [n_img_sequense, project_dim]
+                '''
+                encoded = tf.transpose(encoded, perm=(0,2,1,3)) + self.img_embedding(in_img_positions)
+
+                # flatten the sequence and return [batch, n_img_sequense * n_patches_per_img, project_dim]
+                return tf.reshape(encoded, [batch_size, self.num_patches_per_img*self.img_sequence_length, self.projection_dim])
+
+
+        # ACTUALLY BUILD THE MODEL
+        inputs = layers.Input(shape=(self.input_size[0], self.input_size[1], self.num_image_in_sequence))
+
+        # Augment data.
+        if data_augmentation:
+            augmented = utilities_models_tf.augmentor(inputs)
+        else:
+            augmented = inputs
+
+        # Create patches.
+        patches = PatchesFromSparseVolume(self.patch_size)(augmented)
+        # Encode patches.
+        encoded_patches = SparceVolumePatchEncoder(self.num_patches,
+                            self.num_image_in_sequence,
+                            self.projection_dim)(patches)
+
+        # Create multiple layers of the Transformer block.
+        for _ in range(self.transformer_layers):
+            # Layer normalization 1.
+            x1 = layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
+            # Create a multi-head attention layer.
+            attention_output = layers.MultiHeadAttention(
+                num_heads=num_heads, key_dim=self.projection_dim, dropout=0.1
+            )(x1, x1)
+            # Skip connection 1.
+            x2 = layers.Add()([attention_output, encoded_patches])
+            # Layer normalization 2.
+            x3 = layers.LayerNormalization(epsilon=1e-6)(x2)
+            # MLP.
+            x3 = mlp(x3, hidden_units=transformer_units, dropout_rate=0.1)
+            # Skip connection 2.
+            encoded_patches = layers.Add()([x3, x2])
+
+        # Create a [batch_size, projection_dim] tensor.
+        representation = layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
+        representation = layers.Flatten()(representation)
+        representation = layers.Dropout(0.5)(representation)
+        # Add MLP.
+        features = mlp(representation, hidden_units=self.mlp_head_units, dropout_rate=0.5)
+        # Classify outputs.
+        logits = layers.Dense(self.num_classes, activation='softmax')(features)
+        # Create the Keras model.
+        self.model = Model(inputs=inputs, outputs=logits)
