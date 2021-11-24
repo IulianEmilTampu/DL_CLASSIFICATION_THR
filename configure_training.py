@@ -177,7 +177,7 @@ if not os.path.isdir(dataset_folder):
 if not custom_classification:
     # check if the train_test_split file is provided.
     if not os.path.isfile(train_test_split):
-        raise ValueError('Custom classification is set to false, but give train_test_split file is not specified. Provide a valid one. Given {train_test_split}')
+        raise ValueError(f'Custom classification is set to false, but give train_test_split file is not specified. Provide a valid one. Given {train_test_split}')
 
 if debug:
     print(f'\n{"-"*70}')
@@ -330,7 +330,7 @@ else:
                 # append basefolder and extention to the files
                 # infere file extention from the dataset files
                 _, extension = os.path.splitext(glob.glob(os.path.join(dataset_folder, '*'))[10])
-                train_val_filenames = [os.path.join(dataset_folder, f+extension) for f3D in train_val_filenames]
+                train_val_filenames = [os.path.join(dataset_folder, f+extension) for f in train_val_filenames]
                 test_filenames = [os.path.join(dataset_folder, f+extension) for f in test_filenames]
 
         else:
@@ -534,7 +534,7 @@ else:
     print(f'\n {"¤"*10} \n ATTENTION! Not checking if test images are in the training/validation pool. \n Use with care!!! \n {"¤"*10}')
 
 print(f'\nWill train and validate on {n_train} images (some might have been removed since not classifiable in this task)')
-print(f'Will test on {n_test} images ({n_images_per_class} for each class)')
+print(f'Will test on {n_test} images ({n_test//len(class_weights)} for each class)')
 print(f'{"Class weights":<10s}: {class_weights}')
 
 ## prepare for cross validation
