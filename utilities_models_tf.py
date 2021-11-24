@@ -290,12 +290,14 @@ def plotModelPerformance_v2(tr_loss, tr_acc, val_loss, val_acc, tr_f1, val_f1, s
     l5 = ax2.plot(tr_f1, colors[4], ls=line_style[2])
     l6 = ax2.plot(val_f1, colors[5], ls=line_style[3])
     if best_epoch:
-        l7 = ax2.axvline(x=best_epoch)
+        l7 = ax2.axvline(x=best_epoch, color=colors[6], ls=line_style[0] )
 
     # add legend
     if best_epoch:
-        lns = l1+l2+l3+l4+l5+l6+l7
-        labs = ['Training loss', 'Validation loss', 'Training accuracy', 'Validation accuracy', 'Training F1-score', 'Validation F1-score', 'Best_model']
+        # lns = l1+l2+l3+l4+l5+l6+l7
+        # labs = ['Training loss', 'Validation loss', 'Training accuracy', 'Validation accuracy', 'Training F1-score', 'Validation F1-score', 'Best_model']
+        lns = l1+l2+l3+l4+l5+l6
+        labs = ['Training loss', 'Validation loss', 'Training accuracy', 'Validation accuracy', 'Training F1-score', 'Validation F1-score']
         ax1.legend(lns, labs, loc=7, fontsize=15)
     else:
         lns = l1+l2+l3+l4+l5+l6
@@ -305,9 +307,13 @@ def plotModelPerformance_v2(tr_loss, tr_acc, val_loss, val_acc, tr_f1, val_f1, s
     ax1.set_title('Training loss, accuracy and F1-score trends', fontsize=20)
     ax1.grid()
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
-    fig.savefig(os.path.join(save_path, 'perfomance.pdf'), bbox_inches='tight', dpi = 100)
-    fig.savefig(os.path.join(save_path, 'perfomance.png'), bbox_inches='tight', dpi = 100)
-    plt.close()
+
+    if save_path:
+        if os.path.isdir(save_path):
+            fig.savefig(os.path.join(save_path, 'perfomance.pdf'), bbox_inches='tight', dpi = 100)
+            fig.savefig(os.path.join(save_path, 'perfomance.png'), bbox_inches='tight', dpi = 100)
+        else:
+            print(f'Save path not found. Given {save_path}. Skipping...')
 
     if display is True:
         plt.show()
@@ -749,14 +755,14 @@ def train(self, training_dataloader,
                                     self.train_f1_history,
                                     self.val_f1_history,
                                     self.save_model_path,
-                                    best_epoch=None,
+                                    best_epoch=self.best_epoch,
                                     display=False)
 
             plotLearningRate(self.learning_rate_history, self.save_model_path, display=False)
 
         if early_stopping:
             # check if model accurary improved, and update counter if needed
-            if self.val_f1_history[-1] > self.best_f1:
+            if self.val_f1_history[-1] >= self.best_f1:
                 # save model checkpoint
                 if self.verbose == 1 or self.verbose == 2:
                     print(' - Saving model checkpoint in {}'.format(self.save_model_path))
@@ -780,14 +786,24 @@ def train(self, training_dataloader,
                         n_wait += 1
                 else:
                     n_wait += 1
+
             # check max waiting is reached
-            if n_wait == patience:
+            if n_wait == patience :
                 if self.verbose == 1 or self.verbose == 2:
                     print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                     # saving last model as well
                     self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
                     self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
                 break
+
+        # save last model even when running through all the available epochs
+        if epoch == self.maxEpochs-1:
+            if self.verbose == 1 or self.verbose == 2:
+                print(' -  Run through all the epochs. Last model saved in {}'.format(self.save_model_path))
+                # saving last model as well
+                self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
+                self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
+            break
 
 ## TRAINING ROUTINE FOR VAE MODEL
 def train_VAE(self, training_dataloader,
@@ -1240,7 +1256,7 @@ def save_model(self):
     # save extra information
     model_summary = {
         'Model_name' : self.model_name,
-        'Num_input_channels': self.number_of_input_channels,
+        'Num_input_channels': self.number_of_input_channels if hasattr(self, 'number_of_input_channels') else 'NaN',
         'Num_classes' : self.num_classes,
         'Input_size' : self.input_size,
         'Class_weights': self.class_weights.tolist() if not isinstance(self.class_weights, list) else self.class_weights,
