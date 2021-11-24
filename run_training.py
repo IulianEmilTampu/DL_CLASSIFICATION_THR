@@ -264,151 +264,151 @@ for cv in range(config['N_FOLDS']):
                         warm_up_learning_rate = warm_up_learning_rate,
                         verbose=config['verbose']
                         )
-
-
-    # test model
-    print(' - Testing fold...')
-    test_dataset = utilities.TFR_2D_dataset(config['test'],
-                    dataset_type = 'test',
-                    batch_size=config['batch_size'],
-                    buffer_size=1000,
-                    crop_size=config['input_size'])
-
-
-    importlib.reload(utilities_models_tf)
-    test_gt, test_prediction, test_time = utilities_models_tf.test(model, test_dataset)
-    test_fold_summary[cv]={
-            'ground_truth':np.argmax(test_gt.numpy(), axis=-1),
-            'prediction':test_prediction.numpy(),
-            'test_time':float(test_time)
-            }
-
-    # delete model to free space
-    # del model
-    # del train_dataset
-    # del val_dataset
-
-## CROSS_VALIDATION TESTING
-from collections import OrderedDict
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-'''
-Saving overall cross validation test results and images:
-- Confisuion matrix
-- ROC curve
-- Precision-Recall curve
-
-- test summary file with the prediction for every test image (test_summary.txt)
-    Here add also the information needed to re-plot the ROC and PP curves (fpr,
-    tpr, roc_auc, precision and recall - micro and macro average)
-    The test_summary.txt file is a dictionary with the following entries:
-    - model_name: string
-    - labels: list of the true values fot the tested images
-    - fold_test_values: list containing the predictions for every fold (list of lists)
-
-    - test_time: string
-    - test date: string
-
-    - accuracy: float
-
-    - false_positive_rate: list containing the fpr for every class (list of lists)
-    - false_positive_rate_micro_avg: list containing the micro average fpr (used for the overall roc plot)
-    - false_positive_rate_macro_avg: list containing the macro average fpr (used for the overall roc plot)
-
-    - true_positive_rate: list containing the tpr for every class (list of lists)
-    - true_positive_rate_micro_avg: list containing the micro average tpr (used for the overall roc plot)
-    - true_positive_rate_macro_avg: list containing the macro average tpr (used for the overall roc plot)
-
-    - precision: list containing the precision values for every class to plot the PP (list of lists)
-    - precision_micro_avg: list of overall micro average of precision
-    - average_precision: average precision value computed using micro average
-
-    - recall: list containing the recall value for every class to plot the PP (list of lists)
-    - recall_micro_avg: list of overall micro average of recall
-
-    - F1: list of micro and macro average f1-score
-
-Since the full test_summary file is long to open, the scores are also saved in a separate file for easy access
-scores_test_summary.txt
-'''
-# ############# save the information that is already available
-test_summary = OrderedDict()
-
-test_summary['model_name'] = config['model_save_name']
-test_summary['labels'] = [int(i) for i in test_fold_summary[0]['ground_truth']]
-test_summary['folds_test_logits_values'] = [test_fold_summary[cv]['prediction'].tolist() for cv in range(config['N_FOLDS'])]
-test_summary['test_time'] = utilities.tictoc_from_time(np.sum([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])]))
-test_summary['test_date'] = time.strftime("%Y%m%d-%H%M%S")
-
-# ############ plot and save confucion matrix
-ensemble_pred_argmax = []
-ensemble_pred_logits = []
-# compute ensemble
-# compute the logits mean along the folds
-ensemble_pred_logits = np.array(test_summary['folds_test_logits_values']).mean(axis=0)
-# compute argmax prediction
-ensemble_pred_argmax = np.argmax(ensemble_pred_logits, axis=1)
-
-acc = utilities.plotConfusionMatrix(test_summary['labels'], ensemble_pred_argmax, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
-
-# ############ plot and save ROC curve
-fpr, tpr, roc_auc = utilities.plotROC(test_summary['labels'], ensemble_pred_logits, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
-# make elements of the dictionary to be lists for saving
-for key, value in fpr.items():
-    fpr[key]=value.tolist()
-for key, value in tpr.items():
-    tpr[key]=value.tolist()
-for key, value in roc_auc.items():
-    roc_auc[key]=value.tolist()
-
-# ############ plot and save ROC curve
-precision, recall, average_precision, F1 = utilities.plotPR(test_summary['labels'], ensemble_pred_logits, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
-# make elements of the dictionary to be lists for saving
-for key, value in precision.items():
-    precision[key]=value.tolist()
-for key, value in recall.items():
-    recall[key]=value.tolist()
-
-# save all the information in the test summary
-test_summary['accuracy'] = acc
-
-# test_summary['false_positive_rate'] = [fpr[i].tolist() for i in range(len(class_labels))]
-test_summary['false_positive_rate'] = fpr
-# test_summary['false_positive_rate_micro_avg'] = fpr['micro'].tolist()
-# test_summary['false_positive_rate_macro_avg'] = fpr['macro'].tolist()
-
-test_summary['true_positive_rate'] = tpr
-# test_summary['true_positive_rate'] = [tpr[i].tolist() for i in range(len(class_labels))]
-# test_summary['true_positive_rate_micro_avg'] = tpr['micro'].tolist()
-# test_summary['true_positive_rate_macro_avg'] = tpr['macro'].tolist()
-
-test_summary['roc_auc'] = roc_auc
-
-test_summary['precision'] = precision
-# test_summary['precision'] = [precision[i].tolist() for i in range(len(class_labels))]
-# test_summary['precision_micro_avg'] = precision['micro'].tolist()
-
-test_summary['recall'] = recall
-# test_summary['recall'] = [recall[i].tolist() for i in range(len(class_labels))]
-# test_summary['recall_micro_avg'] = recall['micro'].tolist()
-
-test_summary['average_precision'] = average_precision
-test_summary['F1'] = F1
-
-# save summary file
-with open(os.path.join(config['save_model_path'],'test_summary.txt'), 'w') as fp:
-    json.dump(test_summary, fp)
-
-# save score summary
-
-score_test_summary = OrderedDict()
-
-score_test_summary['accuracy'] = acc
-score_test_summary['average_precision'] = average_precision
-score_test_summary['F1'] = F1
-
-with open(os.path.join(config['save_model_path'],'score_test_summary.txt'), 'w') as fp:
-    json.dump(score_test_summary, fp)
+#
+#
+#     # test model
+#     print(' - Testing fold...')
+#     test_dataset = utilities.TFR_2D_dataset(config['test'],
+#                     dataset_type = 'test',
+#                     batch_size=config['batch_size'],
+#                     buffer_size=1000,
+#                     crop_size=config['input_size'])
+#
+#
+#     importlib.reload(utilities_models_tf)
+#     test_gt, test_prediction, test_time = utilities_models_tf.test(model, test_dataset)
+#     test_fold_summary[cv]={
+#             'ground_truth':np.argmax(test_gt.numpy(), axis=-1),
+#             'prediction':test_prediction.numpy(),
+#             'test_time':float(test_time)
+#             }
+#
+#     # delete model to free space
+#     # del model
+#     # del train_dataset
+#     # del val_dataset
+#
+# ## CROSS_VALIDATION TESTING
+# from collections import OrderedDict
+# from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+# from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+# '''
+# Saving overall cross validation test results and images:
+# - Confisuion matrix
+# - ROC curve
+# - Precision-Recall curve
+#
+# - test summary file with the prediction for every test image (test_summary.txt)
+#     Here add also the information needed to re-plot the ROC and PP curves (fpr,
+#     tpr, roc_auc, precision and recall - micro and macro average)
+#     The test_summary.txt file is a dictionary with the following entries:
+#     - model_name: string
+#     - labels: list of the true values fot the tested images
+#     - fold_test_values: list containing the predictions for every fold (list of lists)
+#
+#     - test_time: string
+#     - test date: string
+#
+#     - accuracy: float
+#
+#     - false_positive_rate: list containing the fpr for every class (list of lists)
+#     - false_positive_rate_micro_avg: list containing the micro average fpr (used for the overall roc plot)
+#     - false_positive_rate_macro_avg: list containing the macro average fpr (used for the overall roc plot)
+#
+#     - true_positive_rate: list containing the tpr for every class (list of lists)
+#     - true_positive_rate_micro_avg: list containing the micro average tpr (used for the overall roc plot)
+#     - true_positive_rate_macro_avg: list containing the macro average tpr (used for the overall roc plot)
+#
+#     - precision: list containing the precision values for every class to plot the PP (list of lists)
+#     - precision_micro_avg: list of overall micro average of precision
+#     - average_precision: average precision value computed using micro average
+#
+#     - recall: list containing the recall value for every class to plot the PP (list of lists)
+#     - recall_micro_avg: list of overall micro average of recall
+#
+#     - F1: list of micro and macro average f1-score
+#
+# Since the full test_summary file is long to open, the scores are also saved in a separate file for easy access
+# scores_test_summary.txt
+# '''
+# # ############# save the information that is already available
+# test_summary = OrderedDict()
+#
+# test_summary['model_name'] = config['model_save_name']
+# test_summary['labels'] = [int(i) for i in test_fold_summary[0]['ground_truth']]
+# test_summary['folds_test_logits_values'] = [test_fold_summary[cv]['prediction'].tolist() for cv in range(config['N_FOLDS'])]
+# test_summary['test_time'] = utilities.tictoc_from_time(np.sum([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])]))
+# test_summary['test_date'] = time.strftime("%Y%m%d-%H%M%S")
+#
+# # ############ plot and save confucion matrix
+# ensemble_pred_argmax = []
+# ensemble_pred_logits = []
+# # compute ensemble
+# # compute the logits mean along the folds
+# ensemble_pred_logits = np.array(test_summary['folds_test_logits_values']).mean(axis=0)
+# # compute argmax prediction
+# ensemble_pred_argmax = np.argmax(ensemble_pred_logits, axis=1)
+#
+# acc = utilities.plotConfusionMatrix(test_summary['labels'], ensemble_pred_argmax, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
+#
+# # ############ plot and save ROC curve
+# fpr, tpr, roc_auc = utilities.plotROC(test_summary['labels'], ensemble_pred_logits, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
+# # make elements of the dictionary to be lists for saving
+# for key, value in fpr.items():
+#     fpr[key]=value.tolist()
+# for key, value in tpr.items():
+#     tpr[key]=value.tolist()
+# for key, value in roc_auc.items():
+#     roc_auc[key]=value.tolist()
+#
+# # ############ plot and save ROC curve
+# precision, recall, average_precision, F1 = utilities.plotPR(test_summary['labels'], ensemble_pred_logits, classes=config['label_description'], savePath=config['save_model_path'], draw=False)
+# # make elements of the dictionary to be lists for saving
+# for key, value in precision.items():
+#     precision[key]=value.tolist()
+# for key, value in recall.items():
+#     recall[key]=value.tolist()
+#
+# # save all the information in the test summary
+# test_summary['accuracy'] = acc
+#
+# # test_summary['false_positive_rate'] = [fpr[i].tolist() for i in range(len(class_labels))]
+# test_summary['false_positive_rate'] = fpr
+# # test_summary['false_positive_rate_micro_avg'] = fpr['micro'].tolist()
+# # test_summary['false_positive_rate_macro_avg'] = fpr['macro'].tolist()
+#
+# test_summary['true_positive_rate'] = tpr
+# # test_summary['true_positive_rate'] = [tpr[i].tolist() for i in range(len(class_labels))]
+# # test_summary['true_positive_rate_micro_avg'] = tpr['micro'].tolist()
+# # test_summary['true_positive_rate_macro_avg'] = tpr['macro'].tolist()
+#
+# test_summary['roc_auc'] = roc_auc
+#
+# test_summary['precision'] = precision
+# # test_summary['precision'] = [precision[i].tolist() for i in range(len(class_labels))]
+# # test_summary['precision_micro_avg'] = precision['micro'].tolist()
+#
+# test_summary['recall'] = recall
+# # test_summary['recall'] = [recall[i].tolist() for i in range(len(class_labels))]
+# # test_summary['recall_micro_avg'] = recall['micro'].tolist()
+#
+# test_summary['average_precision'] = average_precision
+# test_summary['F1'] = F1
+#
+# # save summary file
+# with open(os.path.join(config['save_model_path'],'test_summary.txt'), 'w') as fp:
+#     json.dump(test_summary, fp)
+#
+# # save score summary
+#
+# score_test_summary = OrderedDict()
+#
+# score_test_summary['accuracy'] = acc
+# score_test_summary['average_precision'] = average_precision
+# score_test_summary['F1'] = F1
+#
+# with open(os.path.join(config['save_model_path'],'score_test_summary.txt'), 'w') as fp:
+#     json.dump(score_test_summary, fp)
 
 
 
