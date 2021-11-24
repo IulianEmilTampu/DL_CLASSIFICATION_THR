@@ -224,7 +224,7 @@ def get_organized_files(file_names, classification_type,
 
     return final_file_names, labels, organized_files
 
-## TENSORFLOW DATA GENERATOR
+## TENSORFLOW DATA GENERATOR 2D
 
 '''
  ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤ TFRecord dataset functions
@@ -321,7 +321,84 @@ def TFR_2D_dataset_withStringName(filepath, dataset_type, batch_size, buffer_siz
 
     return dataset
 
+## TENSORFLOW DATA GENERATOR SPARSE 3D
 
+'''
+ ¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤ TFRecord dataset functions
+
+There are two main functions here:
+1 - _parse_function -> opens the TFRecord files using the format used during the
+                      creation of the TFRecord files. Whithin this function one
+                      can manuputale the data in the record to prepare the images
+                      and the labels used by the model e.g. add extra channels or crop.
+2 - create_dataset -> this looks at all the TFRecords files specified in the dataset
+                      and retrievs, shuffles, buffers the data for the model.
+                      One here can even implement augmentation if needed. This
+                      returns a dataset that the model will use (image, label) format.
+ The hyper-parameters needed for the preparation of the dataset are:
+- batch_size: how many samples at the time should be fed into the model.
+- number of parallel loaders: how many files are read at the same time.
+- buffer_size: number of samples (individual subjects) that will be used for the
+              shuffling procedure!
+'''
+def _parse_function_sparse_3D(proto, crop_size):
+  '''
+  Parse the TFrecord files. In this function one can change the 'structure' of
+  the input or output based on the model requirements. Note that no boolean
+  operators are accepted if the function should be ingluded in the graph.
+  '''
+
+  key_features = {
+    'xdim' : tf.io.FixedLenFeature([], tf.int64),
+    'zdim' : tf.io.FixedLenFeature([], tf.int64),
+    'ydim' : tf.io.FixedLenFeature([], tf.int64),
+    'nCh'  : tf.io.FixedLenFeature([], tf.int64),
+    'sparse_volume' : tf.io.FixedLenFeature([], tf.string),
+    'label_c1' : tf.io.FixedLenFeature([], tf.int64),
+    'label_c2' : tf.io.FixedLenFeature([], tf.int64),
+    'label_c3' : tf.io.FixedLenFeature([], tf.int64)
+  }
+  parsed_features = tf.io.parse_single_example(proto, key_features)
+
+  # parse input dimentions
+  xdim = parsed_features['xdim']
+  zdim = parsed_features['zdim']
+  ydim = parsed_features['ydim']
+  nCh = parsed_features['nCh']
+
+  sparse_volume = tf.io.parse_tensor(parsed_features['sparse_volume'], out_type=tf.float32)
+  sparse_volume = tf.reshape(sparse_volume, shape=[xdim,zdim,ydim])
+  sparse_volume = tf.image.crop_to_bounding_box(sparse_volume[:,:,0:15], 0, 0, crop_size[0], crop_size[1])
+
+  # parse lable
+  c1 = parsed_features['label_c1']
+  c2 = parsed_features['label_c2']
+  c3 = parsed_features['label_c3']
+
+  return tf.expand_dims(sparse_volume, axis=-1), [c1, c2, c3]
+
+
+'''
+uset the above to create the dataset
+'''
+def TFR_3D_sparse_dataset(filepath, dataset_type, batch_size, buffer_size=100, crop_size=(200, 200), classification_type=None, unique_labels=None):
+    # point to the files of the dataset
+    dataset = tf.data.TFRecordDataset(filepath)
+    # parse sample
+    dataset = dataset.map(lambda x: _parse_function_sparse_3D(x, crop_size=crop_size),
+                num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    # shuffle the training dataset
+    if dataset_type == 'train':
+        dataset = dataset.shuffle(buffer_size=buffer_size)
+
+    # set bach_size
+    dataset = dataset.batch(batch_size=batch_size)
+
+    # prefetch batches
+    dataset = dataset.prefetch(50)
+
+    return dataset
 
 ## METRICS
 
@@ -375,7 +452,7 @@ def tictoc_from_time(elapsed=1):
 
 ## CONFISION MATRIX
 
-def plotConfusionMatrix(GT, PRED, classes, Labels=None, cmap=plt.cm.Blues, savePath=None, draw=False):
+def plotConfusionMatrix(GT, PRED, classes, Labels=None, cmap=plt.cm.Blues, savePath=None, saveName=None, draw=False):
     '''
     Funtion that plots the confision matrix given the ground truths and the predictions
     '''
@@ -405,13 +482,17 @@ def plotConfusionMatrix(GT, PRED, classes, Labels=None, cmap=plt.cm.Blues, saveP
     plt.title('Confusion matrix -> ' + 'Accuracy {:05.2f}'.format(acc), fontsize=20)
     fig.tight_layout()
 
-    # save is needed
+    # save if needed
     if savePath is not None:
+        # set up name
+        if saveName is None:
+            saveName = "ConfisionMatrix_ensemble_prediction"
+
         if os.path.isdir(savePath):
-            fig.savefig(os.path.join(savePath, 'ConfisionMatrix_ensemble_prediction.pdf'), bbox_inches='tight', dpi = 100)
-            fig.savefig(os.path.join(savePath, 'ConfisionMatrix_ensemble_prediction.png'), bbox_inches='tight', dpi = 100)
+            fig.savefig(os.path.join(savePath, f'{saveName}.pdf'), bbox_inches='tight', dpi = 100)
+            fig.savefig(os.path.join(savePath, f'{saveName}.png'), bbox_inches='tight', dpi = 100)
         else:
-            raise ValueError('Invalid save path: {}'.format(os.path.join(savePath, 'ConfisionMatrix_ensemble_prediction.pdf')))
+            raise ValueError('Invalid save path: {}'.format(os.path.join(savePath, f'{saveName}')))
 
     if draw is True:
         plt.draw()
@@ -422,7 +503,7 @@ def plotConfusionMatrix(GT, PRED, classes, Labels=None, cmap=plt.cm.Blues, saveP
 
 ## PLOT ROC
 
-def plotROC(GT, PRED, classes, savePath=None, draw=False):
+def plotROC(GT, PRED, classes, savePath=None, saveName=None, draw=False):
     from sklearn.metrics import roc_curve, auc
     from itertools import cycle
     from scipy import interp
@@ -437,6 +518,7 @@ def plotROC(GT, PRED, classes, savePath=None, draw=False):
     - PRED: array of float the identifies the logits prediction
     - classes: list of string that identifies the labels of each class
     - save path: sting that identifies the path where to save the ROC plots
+    - save name: string specifying the name of the file to be saved
     - draw: bool if to print or not the ROC curve
 
     RETURN
@@ -559,11 +641,15 @@ def plotROC(GT, PRED, classes, savePath=None, draw=False):
 
     # save is needed
     if savePath is not None:
+        # set up name
+        if saveName is None:
+            saveName = "Multiclass_ROC"
+
         if os.path.isdir(savePath):
-            fig.savefig(os.path.join(savePath, 'Multiclass ROC.pdf'), bbox_inches='tight', dpi = 100)
-            fig.savefig(os.path.join(savePath, 'Multiclass ROC.png'), bbox_inches='tight', dpi = 100)
+            fig.savefig(os.path.join(savePath, f'{saveName}.pdf'), bbox_inches='tight', dpi = 100)
+            fig.savefig(os.path.join(savePath, f'{saveName}.png'), bbox_inches='tight', dpi = 100)
         else:
-            raise ValueError('Invalida save path: {}'.format(savePath))
+            raise ValueError('Invalid save path: {}'.format(os.path.join(savePath, f'{saveName}')))
 
     if draw is True:
         plt.draw()
@@ -574,7 +660,7 @@ def plotROC(GT, PRED, classes, savePath=None, draw=False):
 
 ## PLOR PR (precision and recall) curves
 
-def plotPR(GT, PRED, classes, savePath=None, draw=False):
+def plotPR(GT, PRED, classes, savePath=None, saveName=None, draw=False):
     from sklearn.metrics import precision_recall_curve, average_precision_score, f1_score
     from sklearn.metrics import average_precision_score
     from itertools import cycle
@@ -591,6 +677,7 @@ def plotPR(GT, PRED, classes, savePath=None, draw=False):
     - PRED: array of float the identifies the logits prediction
     - classes: list of string that identifies the labels of each class
     - save path: sting that identifies the path where to save the ROC plots
+    - save name: string the specifies the name of the file to be saved.
     - draw: bool if to print or not the ROC curve
 
     RETURN
@@ -668,11 +755,15 @@ def plotPR(GT, PRED, classes, savePath=None, draw=False):
 
     # save is needed
     if savePath is not None:
+        # set up name
+        if saveName is None:
+            saveName = "Multiclass_PR"
+
         if os.path.isdir(savePath):
-            fig.savefig(os.path.join(savePath, 'Multiclass PR.pdf'), bbox_inches='tight', dpi = 100)
-            fig.savefig(os.path.join(savePath, 'Multiclass PR.png'), bbox_inches='tight', dpi = 100)
+            fig.savefig(os.path.join(savePath, f'{saveName}.pdf'), bbox_inches='tight', dpi = 100)
+            fig.savefig(os.path.join(savePath, f'{saveName}.png'), bbox_inches='tight', dpi = 100)
         else:
-            raise ValueError('Invalida save path: {}'.format(savePath))
+            raise ValueError('Invalid save path: {}'.format(os.path.join(savePath, f'{saveName}')))
 
     if draw is True:
         plt.draw()
@@ -733,7 +824,7 @@ def show_batch_2D_with_histogram(sample_batched, title=None):
 
     """
     Creates a grid of images with the samples contained in a batch of data.
-    Here showing 5 random examples along with theirplt histogram.
+    Here showing 5 random examples along with their plt histogram.
 
     Parameters
     ----------
@@ -771,6 +862,79 @@ def show_batch_2D_with_histogram(sample_batched, title=None):
 
     plt.show()
 
+def plot_sparse_volume(sparse_volume_batch, title=None, img_per_row=5, which_sample=None):
+    '''
+    Given a sparse volume batch in the form [batch, with, hight, depth, channels]
+    shows all the slides composing the spase volume.
+    '''
+    import matplotlib
+    from mpl_toolkits.axes_grid1 import ImageGrid
+
+    if not which_sample:
+        random_batch = np.random.randint(sparse_volume_batch[0].shape[0])
+    else:
+        # make sure which_sample is int
+        random_batch = int(which_sample)
+
+    n_slides = sparse_volume_batch[0].shape[-2]
+    nrows = n_slides//img_per_row
+    if n_slides%img_per_row > 0:
+        nrows += 1
+    ncols = img_per_row
+
+    # make figure grid
+    fig = plt.figure(figsize=(4., 4.))
+    grid = ImageGrid(fig, 111,
+                    nrows_ncols=(nrows, ncols),
+                    axes_pad=0.3,  # pad between axes in inch.
+                    label_mode='L',
+                    )
+
+    # fill in the axis with b-scans
+    for i in range(n_slides):
+        img = np.squeeze(sparse_volume_batch[0][random_batch,:,:,i,:])
+        grid[i].imshow(img, cmap='gray', interpolation=None)
+        grid[i].set_xticks([])
+        grid[i].set_yticks([])
+        grid[i].set_title(f'slice {i+1} - {sparse_volume_batch[1][random_batch]}')
+
+    if title:
+        fig.suptitle(title, fontsize=20)
+    else:
+        fig.suptitle(f'Sparse volume (sample batch {random_batch})', fontsize=20)
+
+    plt.show()
+
+def plot_histogram_sparse_volume(sparse_volume_batch, title=None,  which_sample=None):
+    '''
+    Given a sparse volume batch in the form [batch, with, hight, depth, channels]
+    shows the histogram of all the slides in it for one sample batch.
+    '''
+    import matplotlib
+
+    if not which_sample:
+        random_batch = np.random.randint(sparse_volume_batch[0].shape[0])
+    else:
+        # make sure which_sample is int
+        random_batch = int(which_sample)
+
+    n_slides = sparse_volume_batch[0].shape[-2]
+
+    hist_fig = plt.axes()
+    colors = matplotlib.cm.get_cmap('viridis')
+
+    # work on the histogram
+    for i in range(n_slides):
+        img = np.squeeze(sparse_volume_batch[0][random_batch,:,:,i,:])
+
+        c = colors((i+1)/n_slides)
+        hist_fig.hist(img.ravel(), facecolor=c, alpha=0.3, bins=100)
+        hist_fig.set_title(f'Histogram of all slices for sampe {random_batch} in this batch')
+
+    hist_fig.legend([f'Slice {i+1}' for i in range(n_slides)])
+
+    plt.show()
+
 ##
 
 '''
@@ -786,7 +950,11 @@ Grad-CAM implementation [1] as described in post available at [2].
 '''
 
 class gradCAM:
-    def __init__(self, model, classIdx, layerName=None, use_image_prediction=True, ViT=False, debug=False):
+    def __init__(self, model, classIdx, layerName=None,
+                use_image_prediction=True,
+                ViT=False,
+                is_3D=False,
+                debug=False):
         '''
         model: model to inspect
         classIdx: index of the class to ispect
@@ -798,6 +966,7 @@ class gradCAM:
         self.debug = debug
         self.use_image_prediction = use_image_prediction
         self.is_ViT = ViT
+        self.is_3D = is_3D
 
         # if the layerName is not provided, find the last conv layer in the model
         if self.layerName is None:
@@ -890,7 +1059,7 @@ class gradCAM:
             castGrads = tf.cast(grads > 0, tf.float32)
         guidedGrads = castConvOutputs * castGrads * grads
 
-        # remove teh batch dimension
+        # remove the batch dimension
         convOutputs = convOutputs[0]
         guidedGrads = guidedGrads[0]
 
@@ -899,16 +1068,38 @@ class gradCAM:
         weights = tf.reduce_mean(guidedGrads, axis=(0,1))
         cam = tf.reduce_sum(tf.multiply(weights, convOutputs), axis=-1)
 
-        # now that we have the astivation map for the specific layer, we need
+        # now that we have the activation map for the specific layer, we need
         # to resize it to be the same as the input image
         if self.is_ViT:
-            dim = int(np.sqrt(cam.shape[0]))
-            (w, h) = (image.shape[2], image.shape[1])
-            heatmap = cam.numpy().reshape((dim, dim))
-            heatmap = cv2.resize(heatmap,(w, h))
+            if self.is_3D:
+                # here we take the middle slice (don't take mean or sum since the
+                # channels are not conv filters, but the actual activation for
+                # the different images in the sequence). This is different compared
+                # to a normal conv3d, where the chanlles are descriptive of all
+                # the images at the same time
+                dim = int(np.sqrt(cam.shape[0]/image.shape[3]))
+                (w, h) = (image.shape[2], image.shape[1])
+                heatmap = cam.numpy().reshape((dim, dim, image.shape[3]))
+                heatmap = heatmap[:,:,heatmap.shape[-1] // 2]
+                heatmap = cv2.resize(heatmap,(w, h))
+            else:
+                dim = int(np.sqrt(cam.shape[0]))
+                (w, h) = (image.shape[2], image.shape[1])
+                heatmap = cam.numpy().reshape((dim, dim))
+                heatmap = cv2.resize(heatmap,(w, h))
         else:
-            (w, h) = (image.shape[2], image.shape[1])
-            heatmap = cv2.resize(cam.numpy(),(w, h))
+            if self.is_3D:
+                # reshape cam to the layer input shape and then take the middle
+                # slice
+                layer_shape = self.model.get_layer(self.layerName).input_shape
+                heatmap = cam.numpy().reshape((layer_shape[1], layer_shape[2], layer_shape[3]))
+                heatmap = np.mean(heatmap, axis=-1)
+                # heatmap = heatmap[:,:,heatmap.shape[-1]//2]
+                (w, h) = (image.shape[2], image.shape[1])
+                heatmap = cv2.resize(heatmap,(w, h))
+            else:
+                (w, h) = (image.shape[2], image.shape[1])
+                heatmap = cv2.resize(cam.numpy(),(w, h))
 
         # normalize teh heat map in [0,1] and rescale to [0, 255]
         numer = heatmap - np.min(heatmap)
