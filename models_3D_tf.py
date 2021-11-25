@@ -58,7 +58,7 @@ class LightOCT_3D(object):
                     data_augmentation=True,
                     normalizer=None,
                     class_weights=None,
-                    kernel_size=(5,5),
+                    kernel_size=(5,5,5),
                     model_name='LightOCT_3D',
                     debug=False):
 
@@ -80,13 +80,13 @@ class LightOCT_3D(object):
                         self.num_channels])
 
         # [Conv3d-BatchNorm-LeakyRelu-MaxPool]
-        x = layers.Conv3D(filters=8, kernel_size=(5,5,5), padding='same')(inputs)
+        x = layers.Conv3D(filters=8, kernel_size=self.kernel_size, padding='same')(inputs)
         x = layers.BatchNormalization()(x)
         x = layers.LeakyReLU()(x)
         x = layers.MaxPool3D()(x)
         x = layers.SpatialDropout3D(rate=0.2)(x)
 
-        x = layers.Conv3D(filters=32, kernel_size=(5,5,5), padding='same')(x)
+        x = layers.Conv3D(filters=32, kernel_size=self.kernel_size, padding='same')(x)
         x = layers.BatchNormalization()(x)
         x = layers.LeakyReLU()(x)
         x = layers.MaxPool3D()(x)
@@ -276,3 +276,137 @@ class ViT_3D(object):
         logits = layers.Dense(self.num_classes, activation='softmax')(features)
         # Create the Keras model.
         self.model = Model(inputs=inputs, outputs=logits)
+
+## M4 like model
+
+class M4_3D(object):
+    def __init__(self, num_classes,
+                    num_channels=1,
+                    input_size=(None, None, None),
+                    data_augmentation=True,
+                    normalizer=None,
+                    class_weights=None,
+                    kernel_size=(5,5,5),
+                    model_name='M4_3D',
+                    debug=False):
+
+        self.num_channels = num_channels
+        self.num_classes = num_classes
+        self.input_size=input_size
+        self.debug = debug
+
+        if class_weights is None:
+            self.class_weights = np.ones([1, self.num_classes])
+        else:
+            self.class_weights = class_weights
+        self.model_name = model_name
+        self.kernel_size = kernel_size
+
+        # inputs = Input(shape=self.input_size)
+        inputs = Input(shape=[self.input_size[0],
+                        self.input_size[1],
+                        self.input_size[2],
+                        self.num_channels])
+
+        # save augmented image to compute reconstruction
+        if data_augmentation:
+            x = utilities_models_tf.augmentor(inputs)
+        else:
+            x = inputs
+
+        # build encoder with ResNet-like bloks
+        def Encoder_conv_block(inputs, n_filters, kernel_size=3):
+            '''
+            Takes the input and processes it through three a 3x3 kernel with
+            dilation of 0, 1 and 2 (simulating a 3x3, 5x5 and 7x7 convolution).
+            The result is then concatenated along with the initial input,
+            convolved through a 1x1 convolution and passed through an activation function.
+            '''
+            y = layers.Conv3D(filters=n_filters,kernel_size=(1,1,1),padding='same', dilation_rate=1)(inputs)
+            # perform conv with different kernel sizes
+            conv3 = layers.Conv3D(filters=n_filters,kernel_size=kernel_size,padding='same', dilation_rate=1)(inputs)
+            conv5 = layers.Conv3D(filters=n_filters,kernel_size=kernel_size,padding='same', dilation_rate=2)(inputs)
+            conv7 = layers.Conv3D(filters=n_filters,kernel_size=kernel_size,padding='same', dilation_rate=3)(inputs)
+
+            # perform depth wise  separable convolution to mix the different channels
+            x = tf.concat([y, conv3, conv5, conv7],axis=-1)
+            x = layers.Conv3D(filters=n_filters, kernel_size=(1,1,1), padding='same')(x)
+
+            # normalization
+            x = BatchNormalization()(x)
+
+            # through the activation
+            return tf.keras.layers.LeakyReLU()(x)
+
+        # build encoder
+        x = Encoder_conv_block(x, n_filters=32, kernel_size=self.kernel_size)
+        x = layers.MaxPool3D()(x)
+        x = Encoder_conv_block(x, n_filters=64, kernel_size=self.kernel_size)
+        x = layers.MaxPool3D()(x)
+        x = Encoder_conv_block(x, n_filters=128, kernel_size=self.kernel_size)
+        x = layers.MaxPool3D()(x)
+
+        # bottle-neck
+        x = layers.Conv3D(filters=256, kernel_size=self.kernel_size, padding='same')(x)
+        x = BatchNormalization()(x)
+        x = LeakyReLU()(x)
+        x = layers.Conv3D(filters=256, kernel_size=self.kernel_size, padding='same')(x)
+        # x = tfa.layers.GroupNormalization(groups=int(128/4))(x)
+        x = BatchNormalization()(x)
+        x = tf.keras.layers.LeakyReLU()(x)
+
+        # compress the 3D volume into a 2D image
+        x = layers.Conv3D(filters=1, kernel_size=(1,1,1))(x)
+        x = layers.Conv2D(filters=128, kernel_size=(1,1))(tf.squeeze(x, axis=-1))
+
+        # flatten and then classifier (Flatten makes the model too large. Using
+        # Global average pooling instead - bonus of using None as input size)
+        # x = layers.Flatten()(x)
+        x = layers.GlobalAveragePooling2D()(x)
+
+        # classifier
+        x = layers.Dense(units=64)(x)
+        x = layers.Dropout(rate=0.2)(x)
+        x = layers.Dense(units=32)(x)
+        x = layers.Dropout(rate=0.2)(x)
+        final = Dense(units=self.num_classes, activation='softmax')(x)
+
+        # finally make the model and return
+        self.model = Model(inputs=inputs, outputs=final, name=model_name)
+
+        # save model paramenters
+        self.num_filter_start = 8
+        self.depth = 2
+        self.num_filter_per_layer = [8, 32, 128]
+        self.custom_model = False
+
+        # print model if needed
+        if self.debug is True:
+            print(self.model.summary())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

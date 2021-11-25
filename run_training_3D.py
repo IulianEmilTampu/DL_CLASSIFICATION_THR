@@ -137,7 +137,18 @@ for cv in range(config['N_FOLDS']):
                     kernel_size=config['kernel_size'],
                     model_name=config['model_configuration'],
                     debug=False)
-    if config['model_configuration'] == 'ViT_3D':
+
+    elif config['model_configuration'] == 'M4_3D':
+        model = models_3D_tf.M4_3D(num_classes=len(config['unique_labels']),
+                    num_channels=1,
+                    input_size=config['input_size'],
+                    data_augmentation=False,
+                    class_weights=config['class_weights'],
+                    kernel_size=config['kernel_size'],
+                    model_name=config['model_configuration'],
+                    debug=False)
+
+    elif config['model_configuration'] == 'ViT_3D':
         model = models_3D_tf.ViT_3D(num_image_in_sequence = 15,
                         model_name=config['model_configuration'],
                         num_classes = len(config['unique_labels']),
