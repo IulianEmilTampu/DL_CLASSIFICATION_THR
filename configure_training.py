@@ -58,6 +58,7 @@ parser.add_argument('-l', '--loss', required=False, help='Loss to use to train t
 parser.add_argument('-lr', '--learning_rate', required=False, help='Learning rate.', default=0.001)
 parser.add_argument('-bs', '--batch_size', required=False, help='Batch size.', default=50)
 parser.add_argument('-is', '--input_size', nargs='+', required=False, help='Model input size.', default=(200,200))
+parser.add_argument('-nCh', '--num_channels', required=False, help='Number of input channels.', default=1)
 parser.add_argument('-3d', '--sparse_3d_dataset', required=False, help='If the training dataset is 2D images (False) or 3D sparse volume (True)', default=False)
 parser.add_argument('-ks', '--kernel_size', nargs='+', required=False, help='Encoder conv kernel size.', default=(5,5))
 parser.add_argument('-augment', '--augmentation', required=False, help='Specify if data augmentation is to be performed (True) or not (False)', default=True)
@@ -65,6 +66,8 @@ parser.add_argument('-v', '--verbose',required=False, help='How much to informat
 parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
 parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
 parser.add_argument('-ctd', '--check_training', required=False, help='If True, checks that none of the test images is in the training/validation set', default=True)
+parser.add_argument('-nivc', '--num_img_per_class_validation', required=False, help='Number of images for each class in the validation set.', default=1000)
+parser.add_argument('-nmv', '--num_min_volumes_in_validation', required=False, help='Minumim number of volumes from which the validation images are taken from.', default=2)
 
 # VAE arguments
 parser.add_argument('-vld', '--vae_latent_dim', required=False, help='Dimension of the VAE latent space', default=128)
@@ -96,6 +99,7 @@ loss = args.loss
 learning_rate = float(args.learning_rate)
 batch_size = int(args.batch_size)
 input_size = [int(i) for i in args.input_size]
+num_channels = int(args.num_channels)
 sparse_3d_dataset =  args.sparse_3d_dataset == 'True'
 data_augmentation = args.augmentation
 N_FOLDS = int(args.folds)
@@ -104,6 +108,8 @@ imbalance_data_strategy = args.imbalance_data_strategy
 kernel_size = [int(i) for i in args.kernel_size]
 debug = args.debug == 'True'
 check_training = args.check_training == 'True'
+n_images_per_class = int(args.num_img_per_class_validation)
+min_n_volumes = int(args.num_min_volumes_in_validation)
 
 # VAE variables
 vae_latent_dim = int(args.vae_latent_dim)
@@ -121,27 +127,31 @@ if vit_transformer_units == None:
     # compute default
     vit_transformer_units = [vit_projection_dim * 2, vit_projection_dim]
 
-# # # # # # # # # # parse variables
+# # # # # # # # # parse variables
 # working_folder = '/flush/iulta54/Research/P3-OCT_THR/'
-# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/2D_anisotropic_TFR'
+# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/2D_isotropic_TFR'
 # train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/train_test_split.json'
 # model_configuration = 'LightOCT'
-# model_save_name = 'test_LightOCT'
-# classification_type = 'c4'
+# model_save_name = 'test_fold_setting'
+# classification_type = 'c1'
 # custom_classification = True
 # loss = 'wcce'
-# learning_rate = 0.0001
+# learning_rate = 0.00001
 # dropout_rate = 0.3
 # model_normalization = "BatchNorm"
-# batch_size = 64
+# batch_size = 4
 # input_size = [200, 200]
+# num_channels = 2
 # data_augmentation = True
-# N_FOLDS = 1
+# N_FOLDS = 7
 # verbose = 2
 # imbalance_data_strategy = 'weights'
 # kernel_size = [5,5]
 # check_training = False
 # debug = False
+# n_images_per_class = 10
+# min_n_volumes = 2
+# sparse_3d_dataset = False
 #
 # if "VAE" in model_configuration:
 #     vae_latent_dim = 128
@@ -345,8 +355,6 @@ else:
 
 
 ## split dataset into train+validation and test if custom classicifation
-n_images_per_class = 1000
-min_n_volumes = 2
 
 if custom_classification:
     print('Working on the test dataset...')
@@ -588,7 +596,6 @@ if N_FOLDS >= 2:
 
 else:
     # set 1000 images from each class as validation (like the testing)
-    n_images_per_class = 1000
     per_fold_train_files = [[] for i in range(N_FOLDS)]
     per_fold_val_files = [[] for i in range(N_FOLDS)]
 
@@ -672,6 +679,7 @@ json_dict['loss'] = loss
 json_dict['learning_rate'] = learning_rate
 json_dict['batch_size'] = batch_size
 json_dict['input_size'] = input_size
+json_dict['num_channels'] = num_channels
 json_dict['kernel_size'] = kernel_size
 json_dict['data_augmentation'] = data_augmentation
 

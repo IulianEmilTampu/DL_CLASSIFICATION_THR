@@ -46,17 +46,21 @@ parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wa
 parser.add_argument('-e','--epocs' ,required=False, help='Set the maximum number of epochs used to train the model Default 200.', default=200)
 parser.add_argument('-p','--patience' ,required=False, help='Set the patiencs for early stopping. Default 25', default=25)
 args = parser.parse_args()
+parser.add_argument('-f','--folds', nargs='+' ,required=False, help='Specify which folds to train.', default="None")
+args = parser.parse_args()
 
 configuration_file = args.configuration_file
 debug = args.debug == 'True'
 max_epochs = int(args.epocs)
 patience = int(args.patience)
+folds = [int(i) for i in args.folds] if args.folds != "None" else None
 
 # # # # # # # # # # # # # # # # parse variables DEBUG
-# configuration_file = '/flush/iulta54/Research/P3-OCT_THR/trained_models/TEST_ViT/config.json'
-# debug = True
-# max_epochs = 1
-# patience = 5
+# configuration_file = '/flush/iulta54/Research/P3-OCT_THR/trained_models/test_fold_setting/config.json'
+# debug = False
+# max_epochs = 50
+# patience = 50
+# folds = None
 
 if not os.path.isfile(configuration_file):
     raise ValueError(f'Configuration file not found. Run the configure_training.py script first. Given {configuration_file}')
@@ -81,8 +85,10 @@ with open(configuration_file) as json_file:
     config = json.load(json_file)
 
 ## create folders where to save the data and models for each fold
+if folds is None:
+    folds = range(config['N_FOLDS'])
 
-for cv in range(config['N_FOLDS']):
+for cv in folds:
     if not os.path.isdir(os.path.join(config['save_model_path'], 'fold_'+str(cv+1))):
         os.mkdir(os.path.join(config['save_model_path'], 'fold_'+str(cv+1)))
 
@@ -95,7 +101,7 @@ importlib.reload(utilities_models_tf)
 importlib.reload(utilities)
 
 # ############################ TRAINING
-for cv in range(config['N_FOLDS']):
+for cv in folds:
     print('Working on fold {}/{}. Start time {}'.format(cv+1, config['N_FOLDS'], datetime.now().strftime("%H:%M:%S")))
 
     print(' - Creating datasets...')
@@ -133,7 +139,7 @@ for cv in range(config['N_FOLDS']):
 
     # create model based on specification
     if config['model_configuration'] == 'LightOCT':
-        model = models_tf.LightOCT(number_of_input_channels = 1,
+        model = models_tf.LightOCT(number_of_input_channels = config['num_channels'] if "num_channels" in config.keys() else 1,
                         model_name=config['model_configuration'],
                         num_classes = len(config['unique_labels']),
                         data_augmentation=config['data_augmentation'],
@@ -264,7 +270,7 @@ for cv in range(config['N_FOLDS']):
                         warm_up_learning_rate = warm_up_learning_rate,
                         verbose=config['verbose']
                         )
-#
+##
 #
 #     # test model
 #     print(' - Testing fold...')
