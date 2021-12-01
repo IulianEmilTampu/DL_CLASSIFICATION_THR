@@ -61,7 +61,7 @@ declare -a model_version=best
 
 # run training
 
-python3 -u resume_training.py -m $model -mv $model_version -d $dataset_folder  -e $epocs -p $patience -cf None |& tee -a $log_folder/$save_model_name.log
+python3 -u resume_training.py -m $model -mv $model_version -f $fold -d $dataset_folder -e $epocs -p $patience -cf None -r $overwrite |& tee -a $log_folder/$save_model_name.log
 
 
 
