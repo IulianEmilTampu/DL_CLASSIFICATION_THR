@@ -55,13 +55,14 @@ log_folder=$working_folder/resume_training_models_log
 # ########################## DECLARE VARIABLES
 
 declare -a overwrite=False
-declare -a epocs=10
-declare -a patience=10
+declare -a epocs=100
+declare -a patience=20
 declare -a model_version=best
+declare -a debug=False
 
 # run training
 
-python3 -u resume_training.py -m $model -mv $model_version -f $fold -d $dataset_folder -e $epocs -p $patience -cf None -r $overwrite |& tee -a $log_folder/$save_model_name.log
+python3 -u resume_training.py -m $model -mv $model_version -f $fold -d $dataset_folder -e $epocs -p $patience -cf None -r $overwrite -db $debug |& tee -a $log_folder/$save_model_name.log
 
 
 

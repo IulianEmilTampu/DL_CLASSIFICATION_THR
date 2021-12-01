@@ -51,7 +51,7 @@ parser.add_argument('-cf','--configuration_file' ,required=False, help='Provide 
 parser.add_argument('-r','--overwrite' ,required=True, help='Specify if to overwrite the original model or to save the resumed training model in a separate folder. If False, the resumed model will be saved separately.')
 parser.add_argument('-mv','--model_version' ,required=False, help='Specify which model version to resume training of, the best (best) model or the last (last) model. Default is best', default="best"
 )
-# parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 5 epochs).', default=False)
+parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 5 epochs).', default=False)
 parser.add_argument('-e','--epocs' ,required=False, help='Set the maximum number of epochs used to train the model Default 200.', default=200)
 parser.add_argument('-p','--patience' ,required=False, help='Set the patiencs for early stopping. Default 25', default=25)
 args = parser.parse_args()
@@ -64,17 +64,19 @@ fold = args.fold
 overwrite = args.overwrite == "True"
 max_epochs = int(args.epocs)
 patience = int(args.patience)
+debug = args.debug == "True"
 
-# # # # # # # # # # # # # # # parse variables DEBUG
+# # # # # # # # # # # # # # parse variables DEBUG
 # model_path = '/flush/iulta54/Research/P3-OCT_THR/trained_models/test_resume_training'
 # model_version = 'best'
 # dataset_path = "/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL"
 # fold = "1"
 # overwrite = False
 # debug = True
-# max_epochs = 15
-# patience = 5
-# configuration_file = None
+# max_epochs = 50
+# patience = 50
+# configuration_file = "None"
+# model_3d = False
 
 
 # check if configuration file is provided, if not use the one of in the model_path
@@ -147,7 +149,6 @@ if not overwrite:
     except:
         os.remove(os.path.join(os.path.dirname(save_path), "config.json"))
         shutil.copy(configuration_file, os.path.dirname(save_path))
-
 else:
     save_path = model_path
 
@@ -166,11 +167,27 @@ strings = {"Model to resume training of" : model_file_path,
 
 max_len = np.max([len(key) for key in strings.keys()])
 
+if debug is True:
+    string = "Running resume training routine in debug mode (using lower number of epochs (4) and 10% of the dataset)"
+    l = len(string)
+    print(f'\n{"-"*l}')
+    print(f'{string:^{l}}')
+    print(f'{"-"*l}\n')
+
+    # reducing the number of training epochs
+    max_epochs = 4
+    patience = 4
+
+else:
+    print(f'{"-"*24}')
+    print(f'{"Running resume training routine":^20}')
+    print(f'{"-"*24}\n')
+
 for key, value in strings.items():
     print(f'{key:{max_len}s} : {value}')
 
 ## open model
-print(f'\n   - Loading model...')
+print(f'\n- Loading model...')
 tf_model = tf.keras.models.load_model(model_file_path, compile=False)
 
 # wrap model into custom model wrapper
@@ -204,11 +221,13 @@ class ModelWrapper(object):
         if self.debug is True:
             print(self.model.summary())
 
-##
 model = ModelWrapper(tf_model, config, previous_training_summary)
 
+# check if model is 3D
+model_3D = True if len(config["input_size"])>2 else False
+
 ## create data generator
-print('   - Creating datasets...')
+print('- Creating datasets...')
 # get the file names for training and validation
 X_train = config['training'][int(fold)-1]
 X_val = config['validation'][int(fold)-1]
@@ -219,25 +238,41 @@ X_train = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f)
 X_val = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in X_val]
 X_test = [os.path.join(dataset_path, pathlib.Path(f).parts[-2], pathlib.Path(f).parts[-1]) for f in X_test]
 
+if debug:
+    X_train = random.sample(X_train, int(len(X_train)*0.1))
+
 for f in X_train:
     if not os.path.isfile(f):
         raise ValueError(f'{f} not found')
 
 # create datasets
-train_dataset = utilities.TFR_2D_dataset(X_train,
-                dataset_type = 'train',
-                batch_size=config['batch_size'],
-                buffer_size=5000,
-                crop_size=config['input_size'])
+if model_3D:
+    train_dataset = utilities.TFR_3D_sparse_dataset(X_train,
+                    dataset_type = 'train',
+                    batch_size=1,
+                    buffer_size=500,
+                    crop_size=config['input_size'])
 
-val_dataset = utilities.TFR_2D_dataset(X_val,
-                dataset_type = 'test',
-                batch_size=config['batch_size'],
-                buffer_size=1000,
-                crop_size=config['input_size'])
+    val_dataset = utilities.TFR_3D_sparse_dataset(X_val,
+                    dataset_type = 'test',
+                    batch_size=1,
+                    buffer_size=500,
+                    crop_size=config['input_size'])
+else:
+    train_dataset = utilities.TFR_2D_dataset(X_train,
+                    dataset_type = 'train',
+                    batch_size=config['batch_size'],
+                    buffer_size=5000,
+                    crop_size=config['input_size'])
+
+    val_dataset = utilities.TFR_2D_dataset(X_val,
+                    dataset_type = 'test',
+                    batch_size=config['batch_size'],
+                    buffer_size=1000,
+                    crop_size=config['input_size'])
 
 ## train model
-print('   - Training fold...')
+print('- Training fold...')
 
 warm_up = False,
 warm_up_epochs = 5
