@@ -62,7 +62,6 @@ dataset_path = args.dataset_path
 model_version = args.model_version
 fold = args.fold
 overwrite = args.overwrite == "True"
-debug = args.debug == "True"
 max_epochs = int(args.epocs)
 patience = int(args.patience)
 
