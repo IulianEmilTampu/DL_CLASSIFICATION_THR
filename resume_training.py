@@ -44,8 +44,8 @@ import utilities_models_tf
 ## get parameters
 
 parser = argparse.ArgumentParser(description='Script that resumes the training of the specified model.')
-parser.add_argument('-d','--dataset_path' ,required=True, help='Provide the path to dataset containing the files specified in the configuration file and used for the initial training.'.)
-parser.add_argument('-m','--model_path' ,required=True, help='Provide the path to model that one wants to resume training. The expected path is the one where each model fold is located'.)
+parser.add_argument('-d','--dataset_path' ,required=True, help='Provide the path to dataset containing the files specified in the configuration file and used for the initial training.')
+parser.add_argument('-m','--model_path' ,required=True, help='Provide the path to model that one wants to resume training. The expected path is the one where each model fold is located')
 parser.add_argument('-f','--fold' ,required=True, help='Which model of the one available in the different folds to use.')
 parser.add_argument('-cf','--configuration_file' ,required=False, help='Provide the path to the configuration file generated using the configure_training.py script.', default=None)
 parser.add_argument('-r','--overwrite' ,required=True, help='Specify if to overwrite the original model or to save the resumed training model in a separate folder. If False, the resumed model will be saved separately.')
