@@ -740,13 +740,7 @@ def train(self, training_dataloader,
         if epoch == 0:
             self.num_validation_samples = self.batch_size*step
 
-        if epoch % 2 == 0:
-            # plotModelPerformance(self.train_loss_history,
-            #                         self.train_accuracy_history,
-            #                         self.val_loss_history,
-            #                         self.val_accuracy_history,
-            #                         self.save_model_path,
-            #                         display=False)
+        if (epoch+1) % 2 == 0:
 
             plotModelPerformance_v2(self.train_loss_history,
                                     self.train_accuracy_history,
@@ -791,18 +785,40 @@ def train(self, training_dataloader,
             if n_wait == patience :
                 if self.verbose == 1 or self.verbose == 2:
                     print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
-                    # saving last model as well
-                    self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
-                    self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
+                # saving last model as well
+                self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
+                self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
+
+                plotModelPerformance_v2(self.train_loss_history,
+                                        self.train_accuracy_history,
+                                        self.val_loss_history,
+                                        self.val_accuracy_history,
+                                        self.train_f1_history,
+                                        self.val_f1_history,
+                                        self.save_model_path,
+                                        best_epoch=self.best_epoch,
+                                        display=False)
                 break
 
         # save last model even when running through all the available epochs
         if epoch == self.maxEpochs-1:
             if self.verbose == 1 or self.verbose == 2:
                 print(' -  Run through all the epochs. Last model saved in {}'.format(self.save_model_path))
-                # saving last model as well
-                self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
-                self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
+            # saving last model as well
+            self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
+            self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
+
+            plotModelPerformance_v2(self.train_loss_history,
+                                    self.train_accuracy_history,
+                                    self.val_loss_history,
+                                    self.val_accuracy_history,
+                                    self.train_f1_history,
+                                    self.val_f1_history,
+                                    self.save_model_path,
+                                    best_epoch=self.best_epoch,
+                                    display=False)
+
+
             break
 
 ## TRAINING ROUTINE FOR VAE MODEL
