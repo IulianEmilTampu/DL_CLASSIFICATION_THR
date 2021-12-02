@@ -817,8 +817,6 @@ def train(self, training_dataloader,
                                     self.save_model_path,
                                     best_epoch=self.best_epoch,
                                     display=False)
-
-
             break
 
 ## TRAINING ROUTINE FOR VAE MODEL
