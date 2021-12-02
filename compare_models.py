@@ -42,28 +42,36 @@ from sklearn.metrics import average_precision_score, recall_score, roc_auc_score
 # models = [str(i) for i in args.models]
 
 # ############ for debug
-wcce = "none"
-lr = 0.0001
+wcce = "weights"
+lr = 0.00001
 dr = 0.2
-trained_model_path = "/flush/iulta54/Research/P3-THR_DL/trained_models"
-models = [f"M4_c6_BatchNorm_dr{dr}_lr{lr}_wcce_{wcce}_batch16",
-          f"M4_c6_BatchNorm_dr{dr}_lr{lr}_wcce_{wcce}_batch64",
-          f"M4_c6_BatchNorm_dr{dr}_lr{lr}_wcce_{wcce}_batch128"]
+batch = 64
+trained_model_path = "/flush/iulta54/Research/P3-OCT_BT/trained_models"
+# models = [f"M4_c1_BatchNorm_dr{dr}_lr0.00005_wcce_{wcce}_batch{batch}",
+#           f"M4_c3_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
+#           f"M4_c4_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
+#           f"M4_c5_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
+#           f"M4_c8_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
+#           f"M4_c9_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
+#           f"M4_c11_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
+#           f"M4_c12_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}"]
 
-# models = ["M4_c6_BatchNorm_dr0.2_lr0.001_wcce_none_batch16",
-#           "M4_c6_BatchNorm_dr0.2_lr0.005_wcce_none_batch128",
-#           "M4_c6_BatchNorm_dr0.2_lr0.0005_wcce_weights_batch128",
-#           "M4_c6_BatchNorm_dr0.2_lr0.0001_wcce_none_batch64",
-#           "M4_c6_BatchNorm_dr0.2_lr0.001_wcce_weights_batch64"]
+models = ["LightOCT_lr0.0001_wcce_none_batch64_BOARD",
+          "M4_lr0.00001_wcce_none_batch64_BOARD",
+          "M6_lr0.00001_wcce_weights_batch64_BOARD",
+          "ViT_lr0.001_pts16_prjd32_batch16_BOARD"]
+
+model_versions = ["last", "last", "last","best"]
+test_file_names = [f'{mv}_model_version_test_summary.txt' for mv in model_versions]
 
 # Check that model folder exists and that the test_summary.txt file is present
-for m in models:
+for m, tfm in zip(models, test_file_names):
     if not os.path.isdir(os.path.join(trained_model_path, m)):
-        raise NameError('Model not found. Given {os.path.join(trained_model_path, m)}. Provide a valid model path.')
+        raise NameError(f'Model not found. Given {os.path.join(trained_model_path, m)}. Provide a valid model path.')
     else:
         # check that the test_summary.txt file is present
-        if not os.path.isfile(os.path.join(trained_model_path, m, "test_summary.txt")):
-            raise ValueError(f'The test_summary.txt file is not present in the model path. Run test first. Given {os.path.join(trained_model_path, m, "test_summary.txt")}')
+        if not os.path.isfile(os.path.join(trained_model_path, m, tfm)):
+            raise ValueError(f'The test_summary.txt file is not present in the model path. Run test first. Given {os.path.join(trained_model_path, m, test_file_name)}')
 
 # get the true positive and false positive rates for all the models
 fpr = dict()
@@ -72,9 +80,9 @@ roc_auc = dict()
 acc = dict()
 f1 = dict()
 
-for m in models:
+for m, tfm in zip(models,test_file_names):
     # load the test_summary.txt file and get information
-    with open(os.path.join(trained_model_path, m, 'test_summary.txt')) as file:
+    with open(os.path.join(trained_model_path, m, tfm)) as file:
         test_summary = json.load(file)
         fpr[m] = test_summary['false_positive_rate']
         tpr[m] = test_summary['true_positive_rate']
@@ -96,21 +104,22 @@ for m in models:
 tick_font_size=20
 title_font_size=20
 label_font_size=25
-legend_font_size=8
+legend_font_size="xx-large"
 line_width=2
-save = False
-mml = np.max([len(i) for i in models])
+save = True
+mml = np.max([len(i[0:i.find("_")]) for i in models])
 
 # ########## MACRO AVERAGE
 fig, ax = plt.subplots(figsize=(10,10))
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
 for m, color in zip(models, colors):
+    aus_idx = m.find("_")
     ax.plot(fpr[m]['macro'], tpr[m]['macro'], color=color, lw=line_width,
-            label=f'{m:{mml+2}s}(AUC:{roc_auc[m]["macro"]:0.3f}, F1:{f1[m]["macro"]:0.3f}, ACC:{acc[m]}')
+            label=f'{m[0:aus_idx]:{mml+1}s}(AUC:{roc_auc[m]["macro"]:0.3f}, F1:{f1[m]["macro"]:0.3f}, ACC:{acc[m]/100:0.3f}')
 
 ax.plot([0, 1], [0, 1], 'k--', lw=line_width)
-major_ticks = np.arange(0, 1, 0.1)
-minor_ticks = np.arange(0, 1, 0.05)
+major_ticks = np.arange(0, 1.1, 0.1)
+minor_ticks = np.arange(0, 1.1, 0.05)
 ax.set_xticks(major_ticks)
 ax.set_xticks(minor_ticks, minor=True)
 ax.set_yticks(major_ticks)
@@ -124,7 +133,8 @@ plt.grid(color='b', linestyle='-.', linewidth=0.1, which='both')
 ax.set_xlabel('False Positive Rate', fontsize=label_font_size)
 ax.set_ylabel('True Positive Rate', fontsize=label_font_size)
 ax.set_title('Comparison multi-class ROC - macro-average', fontsize=title_font_size)
-ax.legend(loc="lower right", fontsize=legend_font_size)
+ax.legend(loc="lower right", prop={'family': 'monospace'})
+plt.setp(ax.get_legend().get_texts(), fontsize=legend_font_size)
 
 # ¤¤¤¤¤¤¤¤ work on the zoom-in
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
@@ -146,8 +156,10 @@ axins.set_yticks(np.linspace(y1, y2, 4))
 mark_inset(ax, axins, loc1=1, loc2=3, fc='none', ec='0.5', ls='--')
 
 if save is True:
-    fig.savefig(os.path.join(trained_model_path, f'Model_comparison_macro_avg_{datetime.now().strftime("%H:%M:%S")}.pdf'), bbox_inches='tight', dpi = 100)
-    fig.savefig(os.path.join(trained_model_path, f'Model_comparison_macro_avg_{datetime.now().strftime("%H:%M:%S")}.png'), bbox_inches='tight', dpi = 100)
+    # fig.savefig(os.path.join(trained_model_path, f'Model_comparison_macro_avg_{datetime.now().strftime("%H:%M:%S")}.pdf'), bbox_inches='tight', dpi = 100)
+    # fig.savefig(os.path.join(trained_model_path, f'Model_comparison_macro_avg_{datetime.now().strftime("%H:%M:%S")}.png'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(trained_model_path, f'Model_comparison_macro_avg.pdf'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(trained_model_path, f'Model_comparison_macro_avg.png'), bbox_inches='tight', dpi = 100)
     plt.close()
 else:
     plt.show()
@@ -156,8 +168,9 @@ else:
 fig, ax = plt.subplots(figsize=(10,10))
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
 for m, color in zip(models, colors):
+    aus_idx = m.find("_")
     ax.plot(fpr[m]['micro'], tpr[m]['micro'], color=color, lw=line_width,
-            label=f'{m:{mml+2}s}(AUC:{roc_auc[m]["micro"]:0.3f}, F1:{f1[m]["micro"]:0.3f}, ACC:{acc[m]}')
+            label=f'{m[0:aus_idx]:{mml+2}s}(AUC:{roc_auc[m]["micro"]:0.3f}, F1:{f1[m]["micro"]:0.3f}, ACC:{acc[m]/100:0.3f}')
 
 ax.plot([0, 1], [0, 1], 'k--', lw=line_width)
 major_ticks = np.arange(0, 1.1, 0.1)
@@ -175,7 +188,8 @@ plt.grid(color='b', linestyle='-.', linewidth=0.1, which='both')
 ax.set_xlabel('False Positive Rate', fontsize=label_font_size)
 ax.set_ylabel('True Positive Rate', fontsize=label_font_size)
 ax.set_title('Comparison multi-class ROC - micro-average', fontsize=title_font_size)
-ax.legend(loc="lower right", fontsize=legend_font_size)
+ax.legend(loc="lower right", prop={'family': 'monospace'})
+plt.setp(ax.get_legend().get_texts(), fontsize=legend_font_size)
 
 # ¤¤¤¤¤¤¤¤ work on the zoom-in
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
@@ -197,8 +211,10 @@ axins.set_yticks(np.linspace(y1, y2, 4))
 mark_inset(ax, axins, loc1=1, loc2=3, fc='none', ec='0.5', ls='--')
 
 if save is True:
-    fig.savefig(os.path.join(trained_model_path, f'Model_comparison_micro_avg_{datetime.now().strftime("%H:%M:%S")}.pdf'), bbox_inches='tight', dpi = 100)
-    fig.savefig(os.path.join(trained_model_path, f'Model_comparison_micro_avg_{datetime.now().strftime("%H:%M:%S")}.png'), bbox_inches='tight', dpi = 100)
+    # fig.savefig(os.path.join(trained_model_path, f'Model_comparison_micro_avg_{datetime.now().strftime("%H:%M:%S")}.pdf'), bbox_inches='tight', dpi = 100)
+    # fig.savefig(os.path.join(trained_model_path, f'Model_comparison_micro_avg_{datetime.now().strftime("%H:%M:%S")}.png'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(trained_model_path, f'Model_comparison_micro_avg.pdf'), bbox_inches='tight', dpi = 100)
+    fig.savefig(os.path.join(trained_model_path, f'Model_comparison_micro_avg.png'), bbox_inches='tight', dpi = 100)
     plt.close()
 else:
     plt.show()
@@ -259,7 +275,7 @@ def get_mean_and_std(parameter_dict):
 tick_font_size=20
 title_font_size=16
 label_font_size=12
-legend_font_size=8
+legend_font_size="xx-large"
 line_width=2
 alpha_fillin = 0.1
 save = True
@@ -287,20 +303,20 @@ for parameter, y_label in zip(parameters,y_labels):
 
         # plot training
         ax = axes[0]
-        ax.plot(epochs, tr_mu, lw=line_width, color=color, markevery=marker_on, marker=marker, label=m)
+        ax.plot(epochs, tr_mu, lw=line_width, color=color, markevery=marker_on, marker=marker, label=m[0:m.find("_")])
         ax.fill_between(epochs, tr_mu+tr_std, tr_mu-tr_std, facecolor=color, alpha=alpha_fillin)
         ax.set_title(f'Training {y_label} curves', fontsize=title_font_size)
 
         # plot validation
         ax = axes[1]
-        ax.plot(epochs, val_mu, lw=line_width, color=color, markevery=marker_on, marker=marker, label=m)
+        ax.plot(epochs, val_mu, lw=line_width, color=color, markevery=marker_on, marker=marker, label=m[0:m.find("_")])
         ax.fill_between(epochs, val_mu+val_std, val_mu-val_std, facecolor=color, alpha=alpha_fillin)
         ax.set_title(f'Validation {y_label} curves', fontsize=title_font_size)
 
     # final settings on the axes
     max_epochs = np.max(aus_epochs)
-    major_ticks = np.arange(0, max_epochs, 5)
-    minor_ticks = np.arange(0, max_epochs, 1)
+    major_ticks = np.arange(0, max_epochs, 20)
+    minor_ticks = np.arange(0, max_epochs, 5)
     for ax in axes:
         ax.set_xticks(major_ticks)
         ax.set_xticks(minor_ticks, minor=True)
@@ -311,14 +327,18 @@ for parameter, y_label in zip(parameters,y_labels):
         ax.grid(which="both", color='k', linestyle='--', linewidth=0.1, alpha=0.5)
 
         if y_label=='loss':
-            ax.legend(loc='upper right')
+            ax.legend(loc='upper right', prop={'family': 'monospace'})
+            plt.setp(ax.get_legend().get_texts(), fontsize=legend_font_size)
         else:
-            ax.legend(loc='lower right')
+            ax.legend(loc='lower right', prop={'family': 'monospace'})
+            plt.setp(ax.get_legend().get_texts(), fontsize=legend_font_size)
 
     # save figure if needed
     if save is True:
-        fig.savefig(os.path.join(trained_model_path, f'Model_comparison_{y_label}_{datetime.now().strftime("%H:%M:%S")}.pdf'), bbox_inches='tight', dpi = 100)
-        fig.savefig(os.path.join(trained_model_path, f'Model_comparison_{y_label}_{datetime.now().strftime("%H:%M:%S")}.png'), bbox_inches='tight', dpi = 100)
+        # fig.savefig(os.path.join(trained_model_path, f'Model_comparison_{y_label}_{datetime.now().strftime("%H:%M:%S")}.pdf'), bbox_inches='tight', dpi = 100)
+        # fig.savefig(os.path.join(trained_model_path, f'Model_comparison_{y_label}_{datetime.now().strftime("%H:%M:%S")}.png'), bbox_inches='tight', dpi = 100)
+        fig.savefig(os.path.join(trained_model_path, f'Model_comparison_{y_label}.pdf'), bbox_inches='tight', dpi = 100)
+        fig.savefig(os.path.join(trained_model_path, f'Model_comparison_{y_label}.png'), bbox_inches='tight', dpi = 100)
         plt.close()
     else:
         plt.show()
@@ -350,32 +370,55 @@ all_model_names = []
 
 trained_model_path = "/flush/iulta54/Research/P3-THR_DL/trained_models"
 
-for d in dr:
-    for l in lr:
-        for w in wcce:
-            for b in batch:
-                # build model name
-                model = f"M4_c6_BatchNorm_dr{d}_lr{l}_wcce_{w}_batch{b}"
+# for d in dr:
+#     for l in lr:
+#         for w in wcce:
+#             for b in batch:
+#                 # build model name
+#                 model = f"M4_c6_BatchNorm_dr{d}_lr{l}_wcce_{w}_batch{b}"
+#
+#                 # check if model exists
+#                 if os.path.isdir(os.path.join(trained_model_path, model)):
+#                     # check that the test_summary.txt file is present
+#                     if os.path.isfile(os.path.join(trained_model_path, model, "test_summary.txt")):
+#                         # save information
+#                         all_model_names.append(model)
+#
+#                         # open test_summary and save information
+#                         with open(os.path.join(trained_model_path, model, 'test_summary.txt')) as file:
+#                             test_summary = json.load(file)
+#                             # check if roc_auc is saved, if not compute (in older version was not saved)
+#                             if "roc_auc" in test_summary:
+#                                 all_micro_auc.append(test_summary['roc_auc']['micro'])
+#                                 all_macro_auc.append(test_summary['roc_auc']['macro'])
+#
+#                                 all_micro_f1.append(test_summary['F1']['micro'])
+#                                 all_macro_f1.append(test_summary['F1']['macro'])
+#
+#                                 all_acc.append(test_summary["accuracy"])
 
-                # check if model exists
-                if os.path.isdir(os.path.join(trained_model_path, model)):
-                    # check that the test_summary.txt file is present
-                    if os.path.isfile(os.path.join(trained_model_path, model, "test_summary.txt")):
-                        # save information
-                        all_model_names.append(model)
+trained_model_path = "/flush/iulta54/Research/P3-THR_DL/trained_models/FOR_UPDATE"
+for model in models:
+    # check if model exists
+    if os.path.isdir(os.path.join(trained_model_path, model)):
+        # check that the test_summary.txt file is present
+        if os.path.isfile(os.path.join(trained_model_path, model, "test_summary.txt")):
+            # save information
+            all_model_names.append(model)
 
-                        # open test_summary and save information
-                        with open(os.path.join(trained_model_path, model, 'test_summary.txt')) as file:
-                            test_summary = json.load(file)
-                            # check if roc_auc is saved, if not compute (in older version was not saved)
-                            if "roc_auc" in test_summary:
-                                all_micro_auc.append(test_summary['roc_auc']['micro'])
-                                all_macro_auc.append(test_summary['roc_auc']['macro'])
+            # open test_summary and save information
+            with open(os.path.join(trained_model_path, model, 'test_summary.txt')) as file:
+                test_summary = json.load(file)
+                # check if roc_auc is saved, if not compute (in older version was not saved)
+                if "roc_auc" in test_summary:
+                    all_micro_auc.append(test_summary['roc_auc']['micro'])
+                    all_macro_auc.append(test_summary['roc_auc']['macro'])
 
-                                all_micro_f1.append(test_summary['F1']['micro'])
-                                all_macro_f1.append(test_summary['F1']['macro'])
+                    all_micro_f1.append(test_summary['F1']['micro'])
+                    all_macro_f1.append(test_summary['F1']['macro'])
 
-                                all_acc.append(test_summary["accuracy"])
+                    all_acc.append(test_summary["accuracy"])
+
 ##
 # get the first 4 best models in the different metrics
 # accuracy
@@ -385,25 +428,26 @@ all_best = {"accuracy":[],
             "micro_f1":[],
             "macro_f1":[]}
 
+n_to_show=len(all_model_names)
 
 metric = np.array(all_acc)
-indexes = (-metric).argsort()[:4]
+indexes = (-metric).argsort()[:n_to_show]
 all_best["accuracy"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
 
 metric = np.array(all_macro_auc)
-indexes = (-metric).argsort()[:4]
+indexes = (-metric).argsort()[:n_to_show]
 all_best["macro_auc"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
 
 metric = np.array(all_micro_auc)
-indexes = (-metric).argsort()[:4]
+indexes = (-metric).argsort()[:n_to_show]
 all_best["micro_auc"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
 
 metric = np.array(all_macro_f1)
-indexes = (-metric).argsort()[:4]
+indexes = (-metric).argsort()[:n_to_show]
 all_best["macro_f1"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
 
 metric = np.array(all_micro_f1)
-indexes = (-metric).argsort()[:4]
+indexes = (-metric).argsort()[:n_to_show]
 all_best["micro_f1"] = [{"model":all_model_names[i], "value" : metric[i]} for i in indexes]
 
 # print results
