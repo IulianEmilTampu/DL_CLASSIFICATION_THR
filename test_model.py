@@ -292,7 +292,8 @@ performance_fold = {
             'ROC_AUC':[],
             'Precision': [],
             'Recall':[],
-            'F1':[]
+            'F1':[],
+            'Accuracy':[]
                 }
 if binary_classification:
     performance_fold['Specificity'] = []
@@ -305,8 +306,11 @@ for f in range(len(folds)):
     performance_fold['ROC_AUC'].append(roc_auc_score(labels, pred_logits[f], multi_class='ovr', average='macro'))
     performance_fold['F1'].append(f1_score(np.argmax(labels,-1), np.argmax(pred_logits[f],-1), average='macro'))
 
+    # accuracy
+    tn, fp, fn, tp = confusion_matrix(np.argmax(labels,-1), np.argmax(pred_logits[f], -1)).ravel()
+    performance_fold['Accuracy'].append((tp + tn)/(tp+tn+fp+fn))
+
     if binary_classification:
-        tn, fp, fn, tp = confusion_matrix(np.argmax(labels,-1), np.argmax(pred_logits[f], -1)).ravel()
         performance_fold['Specificity'].append(tn / (tn + fp))
 
 # compute ensamble performance
@@ -324,8 +328,11 @@ performance_ensamble["Recall"] = recall_score(np.argmax(labels,-1), ensemble_pre
 performance_ensamble['ROC_AUC'] = roc_auc_score(labels, ensemble_pred_logits, multi_class='ovr', average='macro')
 performance_ensamble['F1'] = f1_score(np.argmax(labels,-1), ensemble_pred_argmax, average='macro')
 
+tn, fp, fn, tp = confusion_matrix(np.argmax(labels,-1), ensemble_pred_argmax).ravel()
+
+performance_ensamble["Accuracy"] = (tp + tn)/(tp+tn+fp+fn)
+
 if binary_classification:
-    tn, fp, fn, tp = confusion_matrix(np.argmax(labels,-1), ensemble_pred_argmax).ravel()
     performance_ensamble['Specificity'] = tn / (tn + fp)
 
 # ######################### printing on file
@@ -343,7 +350,7 @@ summary.write(f'¤ Per-fold metrics ¤')
 summary.write(f'{"¤"*21}\n')
 
 if binary_classification:
-    keys = ['Specificity','Recall','Precision', 'F1', 'ROC_AUC']
+    keys = ['Specificity','Recall','Precision', 'Accuracy', 'F1', 'ROC_AUC']
 
     summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}\n')
 
@@ -354,7 +361,7 @@ if binary_classification:
     summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}{np.std(performance_fold[keys[4]]):^11.3f}\n\n')
 
 else:
-    keys = ['Recall','Precision', 'F1', 'ROC_AUC']
+    keys = ['Recall','Precision', 'Accuracy','F1', 'ROC_AUC']
 
     summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}\n')
 
@@ -370,12 +377,12 @@ summary.write(f'¤ Ensamble metrics ¤')
 summary.write(f'{"¤"*20}\n')
 
 if binary_classification:
-    keys = ['Specificity','Recall','Precision', 'F1', 'ROC_AUC']
+    keys = ['Specificity','Recall','Precision','Accuracy', 'F1', 'ROC_AUC']
     summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}\n')
     summary.write(f'{"-"*53}\n')
     summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}{performance_ensamble[keys[4]]:^11.3f} \n')
 else:
-    keys = ['Recall','Precision', 'F1', 'ROC_AUC']
+    keys = ['Recall','Precision', 'Accuracy', 'F1', 'ROC_AUC']
     summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}\n')
     summary.write(f'{"-"*44}\n')
     summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}\n')
