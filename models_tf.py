@@ -380,6 +380,114 @@ class M4(object):
         if self.debug is True:
             print(self.model.summary())
 
+## M5 model - Using multiple convs at the same time (3x3 and 7x7)
+
+class M5(object):
+    '''
+   The encoder of the model uses dilated convolutions starting with with a 3x3
+   kernel and with three dilations 0, 1 and 2 (-> simulate a 3x3, 5x5 and 7x7).
+   The result is then concatenated along with the initial input and passed
+   through an activation function.
+    '''
+    def __init__(self, number_of_input_channels,
+                    num_classes,
+                    normalization='BatchNorm',
+                    dropout_rate=0.2,
+                    data_augmentation=True,
+                    class_weights=None,
+                    kernel_size=(5,5),
+                    model_name='M5',
+                    debug=False):
+
+        self.number_of_input_channels = number_of_input_channels
+        self.num_classes = num_classes
+        self.debug = debug
+        if class_weights is None:
+            self.class_weights = np.ones([1, self.num_classes])
+        else:
+            self.class_weights = class_weights
+
+        self.model_name = model_name
+        self.kernel_size=kernel_size
+        self.normalization=normalization
+        self.dropout_rate=dropout_rate
+
+        inputs = Input(shape=[None, None, self.number_of_input_channels])
+
+        # save augmented image to compute reconstruction
+        if data_augmentation:
+            x = utilities_models_tf.augmentor(inputs)
+        else:
+            x = inputs
+
+        # build encoder with ResNet-like bloks
+        def Encoder_conv_block(inputs, n_filters):
+            '''
+            Takes the input and processes it through three a 3x3 kernel with
+            dilation of 0, 1 and 2 (simulating a 3x3, 5x5 and 7x7 convolution).
+            The result is then concatenated along with the initial input,
+            convolved through a 1x1 convolution and passed through an activation function.
+            '''
+            y = Conv2D(filters=n_filters,kernel_size=(1,1),padding='same', dilation_rate=1)(inputs)
+            # perform conv with different kernel sizes
+            conv3 = Conv2D(filters=n_filters,kernel_size=(3,3),padding='same', dilation_rate=1)(inputs)
+            conv7 = Conv2D(filters=n_filters,kernel_size=(3,3),padding='same', dilation_rate=3)(inputs)
+
+            # perform depth wise  separable convolution to mix the different channels
+            x = tf.concat([y, conv3, conv7],axis=-1)
+            x = Conv2D(filters=n_filters, kernel_size=(1,1), padding='same')(x)
+
+            # normalization
+            if self.normalization == 'BatchNorm':
+                x = BatchNormalization()(x)
+            elif self.normalization == 'GroupNorm':
+                x = tfa.layers.GroupNormalization(groups=int(n_filters/4))(x)
+            else:
+                raise ValueError(f'Not recognized normalization type. Expecting BatchNorm or GroupNorm but given {self.normalization}')
+            # through the activation
+            return tf.keras.layers.LeakyReLU()(x)
+
+        # build encoder
+        x = Encoder_conv_block(x, n_filters=32)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+        x = Encoder_conv_block(x, n_filters=64)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+        x = Encoder_conv_block(x, n_filters=128)
+        x = MaxPooling2D(pool_size=(2,2),strides=2)(x)
+
+        # bottle-neck
+        x = Conv2D(filters=256, kernel_size=self.kernel_size, padding='same')(x)
+        x = BatchNormalization()(x)
+        x = LeakyReLU()(x)
+        x = Conv2D(filters=256, kernel_size=self.kernel_size, padding='same')(x)
+        # x = tfa.layers.GroupNormalization(groups=int(128/4))(x)
+        x = BatchNormalization()(x)
+        x = tf.keras.layers.LeakyReLU()(x)
+
+        # encoding vector
+        encoding_vector = GlobalMaxPooling2D()(x)
+
+        # FCN
+        x = Dropout(rate=dropout_rate)(encoding_vector)
+        x = Dense(units=512, activation='relu')(x)
+        x = Dropout(rate=dropout_rate)(x)
+        x = Dense(units=128, activation='relu')(x)
+        x = Dropout(rate=dropout_rate)(x)
+        pred = Dense(units=self.num_classes, activation='softmax')(x)
+
+        self.model = Model(inputs=inputs, outputs=pred, name=model_name)
+
+        # save model paramenters
+        self.num_filter_start = 32
+        self.depth = 3
+        self.num_filter_per_layer = [32, 64, 128]
+        self.custom_model = False
+
+        # print model if needed
+        if self.debug is True:
+            print(self.model.summary())
+
+## M6
 class M6(object):
     def __init__(self, number_of_input_channels,
                     num_classes,
