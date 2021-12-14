@@ -261,53 +261,77 @@ with open(os.path.join(model_path,f'{model_version}_model_version_test_summary.t
     json.dump(test_summary, fp)
 
 ## save summary (can be improved, but using the routine from print_model_performance)
-from sklearn.metrics import average_precision_score, recall_score, roc_auc_score, f1_score, confusion_matrix
+from sklearn.metrics import average_precision_score, recall_score, roc_auc_score, f1_score, confusion_matrix, accuracy_score
+
+def get_metrics(true_logits, pred_logits, average='macro'):
+    '''
+    Utility that given confusion matrics, returns a dictionary containing:
+    tptnfpfn : overall TP, TN, FP, FN values for each of the classes
+    precision (specificity) : for each of the classes
+    recall (sensitivity) : for each of the classes
+    f1-score : for each of the classes
+    auc : for each of the classes
+    overall_acc : over all classes
+    overall_specificity : over all classes
+    overall_precision : over all classes
+    overall_f1-score : over all classes
+    overall_auc : over all classes
+    '''
+    # compute confusion matrix
+    cnf_matrix = confusion_matrix(np.argmax(true_logits,-1), np.argmax(pred_logits, -1))
+
+    # compute TP, TN, FP, FN
+
+    FP = (cnf_matrix.sum(axis=0) - np.diag(cnf_matrix)).astype(float)
+    FN = (cnf_matrix.sum(axis=1) - np.diag(cnf_matrix)).astype(float)
+    TP = (np.diag(cnf_matrix)).astype(float)
+    TN = (cnf_matrix.sum() - (FP + FN + TP)).astype(float)
+
+    # compute per class metrics
+    summary_dict = {
+                'precision': TN / (FP+TN),
+                'recall': TP / (TP+FN),
+                'accuracy': (TP+TN) / (TP+TN+FP+FN),
+                'f1-score': TP / (TP + 0.5*(FP+FN)),
+                'auc': roc_auc_score(true_logits, pred_logits, average=None),
+                }
+
+    # compute overall metrics
+    summary_dict['overall_precision']=average_precision_score(true_logits,
+                                        pred_logits,
+                                        average=average)
+    summary_dict['overall_recall']=recall_score(np.argmax(true_logits,-1),
+                                        np.argmax(pred_logits,-1),
+                                        average=average)
+    summary_dict['overall_accuracy']=accuracy_score(np.argmax(true_logits,-1),
+                                        np.argmax(pred_logits,-1))
+    summary_dict['overall_f1-score']=f1_score(np.argmax(true_logits,-1),
+                                        np.argmax(pred_logits,-1),
+                                        average=average)
+    summary_dict['overall_auc']=roc_auc_score(true_logits,
+                                        pred_logits,
+                                        multi_class='ovr',
+                                        average=average)
+
+    return summary_dict
 
 n_folds = len(folds)
 
 labels = np.eye(np.unique(test_summary['labels']).shape[0])[test_summary['labels']]
 pred_logits = test_summary['folds_test_logits_values']
 
-# check if we are working on a binary or multi-class classification
-binary_classification = True
-if labels.shape[-1] > 2:
-    binary_classification = False
-
-'''
-For binary classification we can compute all the metrics:
-- Specificity
-- Precision
-- Recall (Sensitivity)
-- F1-score
-- AUC for ROC
-
-For multi-class classification we can only compute:
-- Precision
-- Recall (Sensitivity)
-- F1-score
-- AUC for ROC
-'''
 # Computupe per fold performance
 performance_fold = {
             'ROC_AUC':[],
             'Precision': [],
             'Recall':[],
-            'F1':[]
+            'F1':[],
+            'Accuracy':[]
                 }
-if binary_classification:
-    performance_fold['Specificity'] = []
+per_fold_performance = []
 
 for f in range(len(folds)):
-    performance_fold["Precision"].append(average_precision_score(labels, pred_logits[f],
-                                                    average="macro"))
-    performance_fold["Recall"].append(recall_score(np.argmax(labels,-1), np.argmax(pred_logits[f],-1),
-                                                    average="macro"))
-    performance_fold['ROC_AUC'].append(roc_auc_score(labels, pred_logits[f], multi_class='ovr', average='macro'))
-    performance_fold['F1'].append(f1_score(np.argmax(labels,-1), np.argmax(pred_logits[f],-1), average='macro'))
-
-    if binary_classification:
-        tn, fp, fn, tp = confusion_matrix(np.argmax(labels,-1), np.argmax(pred_logits[f], -1)).ravel()
-        performance_fold['Specificity'].append(tn / (tn + fp))
+    per_fold_performance.append(get_metrics(labels, pred_logits[f]))
 
 # compute ensamble performance
 # compute the logits mean along the folds
@@ -315,69 +339,89 @@ ensemble_pred_logits = np.array(pred_logits).mean(axis=0)
 # compute argmax prediction
 ensemble_pred_argmax = np.argmax(ensemble_pred_logits, axis=1)
 
-performance_ensamble = {}
-
-performance_ensamble["Precision"] = average_precision_score(labels, ensemble_pred_logits,
-                                                average="macro")
-performance_ensamble["Recall"] = recall_score(np.argmax(labels,-1), ensemble_pred_argmax,
-                                                average="macro")
-performance_ensamble['ROC_AUC'] = roc_auc_score(labels, ensemble_pred_logits, multi_class='ovr', average='macro')
-performance_ensamble['F1'] = f1_score(np.argmax(labels,-1), ensemble_pred_argmax, average='macro')
-
-if binary_classification:
-    tn, fp, fn, tp = confusion_matrix(np.argmax(labels,-1), ensemble_pred_argmax).ravel()
-    performance_ensamble['Specificity'] = tn / (tn + fp)
+performance_ensamble = get_metrics(labels, ensemble_pred_logits)
 
 # ######################### printing on file
 
 summary = open(os.path.join(model_path,f'{model_version}_model_version_short_test_summary.txt'), 'w')
 
 summary.write(f'\nModel Name: {os.path.basename(model_path)}\n\n')
+
 # add test time overall and per image
 average_test_time = np.mean([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])])
 average_test_time_per_image = np.mean([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])])/labels.shape[0]
 summary.write(f'Overall model test time (average over folds): {utilities.tictoc_from_time(average_test_time)}\n')
 summary.write(f'Average test time per image (average over folds): {utilities.tictoc_from_time(average_test_time_per_image)}\n\n')
-summary.write(f'{"¤"*21}')
-summary.write(f'¤ Per-fold metrics ¤')
-summary.write(f'{"¤"*21}\n')
 
-if binary_classification:
-    keys = ['Specificity','Recall','Precision', 'F1', 'ROC_AUC']
+# print a summary of the testing per fold, class and ensamble
+keys = ['precision','recall', 'accuracy', 'f1-score', 'auc']
+max_len_k=max([len(k) for k in keys])
 
-    summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}\n')
+classes = config['label_description']
+max_len_c=max(max([len(k) for k in classes]),len('Overall'))
 
-    for i in range(n_folds):
-        summary.write(f'{i+1:^7}{performance_fold[keys[0]][i]:^11.3f}{performance_fold[keys[1]][i]:^11.3f}{performance_fold[keys[2]][i]:^11.3f}{performance_fold[keys[3]][i]:^11.3f}{performance_fold[keys[-1]][i]:^11.3f}\n')
-    summary.write(f'{"-"*60}\n')
-    summary.write(f'{"Average":^7}{np.mean(performance_fold[keys[0]]):^11.3f}{np.mean(performance_fold[keys[1]]):^11.3f}{np.mean(performance_fold[keys[2]]):^11.3f}{np.mean(performance_fold[keys[3]]):^11.3f}{np.mean(performance_fold[keys[4]]):^11.3f}\n')
-    summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}{np.std(performance_fold[keys[4]]):^11.3f}\n\n')
+max_len_f=max([len(s) for s in ["Fold", "Average","STD","Ensamble"]])
 
-else:
-    keys = ['Recall','Precision', 'F1', 'ROC_AUC']
+# build dict that holds the avg of all metrics
+avg_dict = {k:[] for k in keys}
 
-    summary.write(f'{"Fold":^7}{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}\n')
+# build headers strings
+fold_str = f'{"Fold":^{max_len_f}}'
+class_str = f'{"Class":^{max_len_c}}'
+keys_str = ''.join([f'{k.capitalize():^{max_len_k+2}}' for k in keys])
 
-    for i in range(n_folds):
-        summary.write(f'{i+1:^7}{performance_fold[keys[0]][i]:^11.3f}{performance_fold[keys[1]][i]:^11.3f}{performance_fold[keys[2]][i]:^11.3f}{performance_fold[keys[3]][i]:^11.3f}\n')
-    summary.write(f'{"-"*50}\n')
-    summary.write(f'{"Average":^7}{np.mean(performance_fold[keys[0]]):^11.3f}{np.mean(performance_fold[keys[1]]):^11.3f}{np.mean(performance_fold[keys[2]]):^11.3f}{np.mean(performance_fold[keys[3]]):^11.3f}\n')
-    summary.write(f'{"STD":^7}{np.std(performance_fold[keys[0]]):^11.3f}{np.std(performance_fold[keys[1]]):^11.3f}{np.std(performance_fold[keys[2]]):^11.3f}{np.std(performance_fold[keys[3]]):^11.3f}\n')
+# start printing
+summary.write(f'\n{"¤"*(max_len_f+max_len_c+len(keys_str))}'+'\n')
+summary.write(f'{"¤ Per-fold metrics ¤":^{(max_len_f+max_len_c+len(keys_str))}}'+'\n')
+summary.write(f'{"¤"*(max_len_f+max_len_c+len(keys_str))}\n')
 
+# print header
+summary.write(fold_str+class_str+keys_str+'\n')
 
-summary.write(f'\n{"¤"*20}')
-summary.write(f'¤ Ensamble metrics ¤')
-summary.write(f'{"¤"*20}\n')
+# print per fold and class metrics
+for idx, fp in enumerate(per_fold_performance):
+    fold_num_str = f'{str(idx+1):^{max_len_f}}'
+    # print per class performance
+    for idc, c in enumerate(classes):
+        class_metrics = ''.join([f'{str(round(fp[k][idc],3)):^{max_len_k+2}}' for k in keys])
+        if idc == 0:
+            summary.write(fold_num_str+f'{c:^{max_len_c}}'+class_metrics+'\n')
+        else:
+            summary.write(f'{" ":^{max_len_f}}'+f'{c:^{max_len_c}}'+class_metrics+'\n')
 
-if binary_classification:
-    keys = ['Specificity','Recall','Precision', 'F1', 'ROC_AUC']
-    summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}{keys[4]:^11}\n')
-    summary.write(f'{"-"*53}\n')
-    summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}{performance_ensamble[keys[4]]:^11.3f} \n')
-else:
-    keys = ['Recall','Precision', 'F1', 'ROC_AUC']
-    summary.write(f'{keys[0]:^11}{keys[1]:^11}{keys[2]:^11}{keys[3]:^11}\n')
-    summary.write(f'{"-"*44}\n')
-    summary.write(f'{performance_ensamble[keys[0]]:^11.3f}{performance_ensamble[keys[1]]:^11.3f}{performance_ensamble[keys[2]]:^11.3f}{performance_ensamble[keys[3]]:^11.3f}\n')
+    # print overall performance
+    summary.write(f'{"-"*(max_len_f+max_len_c+len(keys_str))}'+'\n')
+    overall_metric_str = ''.join([f'{str(round(fp["overall_"+k],3)):^{max_len_k+2}}' for k in keys])
+    summary.write(fold_num_str+f'{"Overall":^{max_len_c}}'+overall_metric_str+'\n')
+    summary.write(f'{"-"*(max_len_f+max_len_c+len(keys_str))}'+'\n\n')
+
+    # save overall metrics for later
+    [avg_dict[k].append(fp['overall_'+k]) for k in keys]
+
+# print average overall metrics for the folds
+avg_overall_metric_str = ''.join([f'{str(round(np.mean(avg_dict[k]),3)):^{max_len_k+2}}' for k in keys])
+std_overall_metric_str = ''.join([f'{str(round(np.std(avg_dict[k]),3)):^{max_len_k+2}}' for k in keys])
+summary.write(f'{"="*(max_len_f+max_len_c+len(keys_str))}'+'\n')
+summary.write(fold_str+class_str+keys_str+'\n')
+summary.write(f'{"Average":^{max_len_f}}'+f'{"":^{len(class_str)}}'+avg_overall_metric_str+'\n')
+summary.write(f'{"STD":^{max_len_f}}'+f'{"":^{len(class_str)}}'+std_overall_metric_str+'\n')
+
+# plot ensamble metrics
+summary.write(f'\n{"¤"*(max_len_f+max_len_c+len(keys_str))}'+'\n')
+summary.write(f'{"¤ Ensamble metrics ¤":^{(max_len_f+max_len_c+len(keys_str))}}'+'\n')
+summary.write(f'{"¤"*(max_len_f+max_len_c+len(keys_str))}\n')
+
+# print header
+summary.write(f'{"Ensamble":^{max_len_f}}'+class_str+keys_str+'\n')
+# print per class performance
+fp = performance_ensamble
+for idc, c in enumerate(classes):
+    class_metrics = ''.join([f'{str(round(fp[k][idc],3)):^{max_len_k+2}}' for k in keys])
+    summary.write(f'{" ":^{max_len_f}}'+f'{c:^{max_len_c}}'+class_metrics+'\n')
+
+# print overall performance
+summary.write(f'{"-"*(max_len_f+max_len_c+len(keys_str))}'+'\n')
+overall_metric_str = ''.join([f'{str(round(fp["overall_"+k],3)):^{max_len_k+2}}' for k in keys])
+summary.write(f'{" ":^{max_len_f}}'+f'{"Overall":^{max_len_c}}'+overall_metric_str+'\n')
 
 summary.close()
