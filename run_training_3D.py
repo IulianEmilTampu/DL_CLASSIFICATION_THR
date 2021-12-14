@@ -111,8 +111,8 @@ for cv in folds:
 
     if debug is True:
         # train on 20% of the dataset
-        X_train = X_train[0: int(np.ceil(0.2*len(X_train)))]
-        X_val = X_val[0: int(np.ceil(0.2*len(X_val)))]
+        X_train = X_train[0: int(np.ceil(0.5*len(X_train)))]
+        X_val = X_val[0: int(np.ceil(0.5*len(X_val)))]
 
     for f in X_train:
         if not os.path.isfile(f):
@@ -122,13 +122,13 @@ for cv in folds:
     train_dataset = utilities.TFR_3D_sparse_dataset(X_train,
                     dataset_type = 'train',
                     batch_size=config['batch_size'],
-                    buffer_size=500,
+                    buffer_size=1000,
                     crop_size=config['input_size'])
 
     val_dataset = utilities.TFR_3D_sparse_dataset(X_val,
                     dataset_type = 'test',
                     batch_size=config['batch_size'],
-                    buffer_size=500,
+                    buffer_size=1000,
                     crop_size=config['input_size'])
 
     # create model based on specification
