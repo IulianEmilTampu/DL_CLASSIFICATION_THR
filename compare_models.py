@@ -46,7 +46,7 @@ wcce = "weights"
 lr = 0.00001
 dr = 0.2
 batch = 64
-trained_model_path = "/flush/iulta54/Research/P3-OCT_BT/trained_models"
+trained_model_path = "/flush/iulta54/Research/P3-OCT_THR/trained_models/c5/5_fold_cross_validation"
 # models = [f"M4_c1_BatchNorm_dr{dr}_lr0.00005_wcce_{wcce}_batch{batch}",
 #           f"M4_c3_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
 #           f"M4_c4_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
@@ -56,12 +56,14 @@ trained_model_path = "/flush/iulta54/Research/P3-OCT_BT/trained_models"
 #           f"M4_c11_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}",
 #           f"M4_c12_BatchNorm_dr{dr}_lr0.00001_wcce_{wcce}_batch{batch}"]
 
-models = ["LightOCT_lr0.0001_wcce_none_batch64_BOARD",
-          "M4_lr0.00001_wcce_none_batch64_BOARD",
-          "M6_lr0.00001_wcce_weights_batch64_BOARD",
-          "ViT_lr0.001_pts16_prjd32_batch16_BOARD"]
+models = ["LightOCT_c5_fold5_BatchNorm_dr0.3_lr0.0000001_wcce_none_batch64",
+        "M4_c5_fold5_BatchNorm_dr0.3_lr0.0001_wcce_weights_batch64",
+        'M6_fold5_c5_BatchNorm_dr0.3_lr0.000001_wcce_weights_batch64',
+        'ViT_fold5_c5_lr0.000001_pts16_prjd32_batch128'
+        ]
 
-model_versions = ["last", "last", "last","best"]
+model_versions = ["last", "last", 'last', 'best']
+
 test_file_names = [f'{mv}_model_version_test_summary.txt' for mv in model_versions]
 
 # Check that model folder exists and that the test_summary.txt file is present
@@ -71,8 +73,8 @@ for m, tfm in zip(models, test_file_names):
     else:
         # check that the test_summary.txt file is present
         if not os.path.isfile(os.path.join(trained_model_path, m, tfm)):
-            raise ValueError(f'The test_summary.txt file is not present in the model path. Run test first. Given {os.path.join(trained_model_path, m, test_file_name)}')
-
+            raise ValueError(f'The test_summary.txt file is not present in the model path. Run test first. Given {os.path.join(trained_model_path, m, tfm)}')
+##
 # get the true positive and false positive rates for all the models
 fpr = dict()
 tpr = dict()
@@ -98,24 +100,33 @@ for m, tfm in zip(models,test_file_names):
         f1[m]= {"macro" : test_summary["F1"]["macro"],
                 "micro" : test_summary["F1"]["micro"]}
 
+
 # plot the comparicon ROC between models (micro and macro average separately)
 
 # overall settings
 tick_font_size=20
 title_font_size=20
 label_font_size=25
-legend_font_size="xx-large"
+legend_font_size="x-large"
 line_width=2
 save = True
-mml = np.max([len(i[0:i.find("_")]) for i in models])
+patter_legend_split = '_'
+mml = np.max([len(i[0:i.find(patter_legend_split)]) for i in models])
+samples_to_show = 100
 
 # ########## MACRO AVERAGE
 fig, ax = plt.subplots(figsize=(10,10))
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
-for m, color in zip(models, colors):
-    aus_idx = m.find("_")
-    ax.plot(fpr[m]['macro'], tpr[m]['macro'], color=color, lw=line_width,
-            label=f'{m[0:aus_idx]:{mml+1}s}(AUC:{roc_auc[m]["macro"]:0.3f}, F1:{f1[m]["macro"]:0.3f}, ACC:{acc[m]/100:0.3f}')
+# markers = cycle(["v", "D", "<", "s", "*", "P", "X", "p", "d", "+"])
+line_styles = cycle(['-', '--','-.',':',  (0, (3, 5, 1, 5, 1, 5)), (0, (3, 10, 1, 10)), (0, (3, 10, 1, 10, 1, 10))])
+for m, color, ls in zip(models, colors, line_styles):
+    aus_idx = m.find(patter_legend_split)
+    ax.plot(fpr[m]['macro'],
+            tpr[m]['macro'],
+            color=color,
+            linestyle=ls,
+            lw=line_width,
+            label=f'{m[0:aus_idx]:{mml+1}s}(AUC:{roc_auc[m]["macro"]:0.3f}, F1:{f1[m]["macro"]:0.3f}, ACC:{acc[m]/100:0.3f})')
 
 ax.plot([0, 1], [0, 1], 'k--', lw=line_width)
 major_ticks = np.arange(0, 1.1, 0.1)
@@ -138,9 +149,14 @@ plt.setp(ax.get_legend().get_texts(), fontsize=legend_font_size)
 
 # ¤¤¤¤¤¤¤¤ work on the zoom-in
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
+line_styles = cycle(['-', '--','-.',':',  (0, (3, 5, 1, 5, 1, 5)), (0, (3, 10, 1, 10)), (0, (3, 10, 1, 10, 1, 10))])
 axins = zoomed_inset_axes(ax, zoom=1, loc=7, bbox_to_anchor=(0,0,0.99,0.9), bbox_transform=ax.transAxes)
-for m, color in zip(models, colors):
-    axins.plot(fpr[m]['macro'], tpr[m]['macro'], color=color, lw=line_width)
+for m, color, ls in zip(models, colors, line_styles):
+    axins.plot(fpr[m]['macro'],
+               tpr[m]['macro'],
+               color=color,
+               linestyle=ls,
+               lw=line_width)
 
 # sub region of the original image
 x1, x2, y1, y2 = 0.0, 0.3, 0.7, 1.0
@@ -167,10 +183,15 @@ else:
 # ########## MICRO AVERAGE
 fig, ax = plt.subplots(figsize=(10,10))
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
-for m, color in zip(models, colors):
-    aus_idx = m.find("_")
-    ax.plot(fpr[m]['micro'], tpr[m]['micro'], color=color, lw=line_width,
-            label=f'{m[0:aus_idx]:{mml+2}s}(AUC:{roc_auc[m]["micro"]:0.3f}, F1:{f1[m]["micro"]:0.3f}, ACC:{acc[m]/100:0.3f}')
+line_styles = cycle(['-', '--','-.',':',  (0, (3, 5, 1, 5, 1, 5)), (0, (3, 10, 1, 10)), (0, (3, 10, 1, 10, 1, 10))])
+for m, color, ls in zip(models, colors, line_styles):
+    aus_idx = m.find(patter_legend_split)
+    ax.plot(fpr[m]['micro'],
+            tpr[m]['micro'],
+            color=color,
+            linestyle=ls,
+            lw=line_width,
+            label=f'{m[0:aus_idx]:{mml+2}s}(AUC:{roc_auc[m]["micro"]:0.3f}, F1:{f1[m]["micro"]:0.3f}, ACC:{acc[m]/100:0.3f})')
 
 ax.plot([0, 1], [0, 1], 'k--', lw=line_width)
 major_ticks = np.arange(0, 1.1, 0.1)
@@ -193,9 +214,14 @@ plt.setp(ax.get_legend().get_texts(), fontsize=legend_font_size)
 
 # ¤¤¤¤¤¤¤¤ work on the zoom-in
 colors = cycle(['blue', 'orange', 'green', 'red','purple','brown','pink','gray','olive','cyan','teal'])
+line_styles = cycle(['-', '--','-.',':',  (0, (3, 5, 1, 5, 1, 5)), (0, (3, 10, 1, 10)), (0, (3, 10, 1, 10, 1, 10))])
 axins = zoomed_inset_axes(ax, zoom=1, loc=7, bbox_to_anchor=(0,0,0.99,0.9), bbox_transform=ax.transAxes)
-for m, color in zip(models, colors):
-    axins.plot(fpr[m]['micro'], tpr[m]['micro'], color=color, lw=line_width)
+for m, color, ls in zip(models, colors, line_styles):
+    axins.plot(fpr[m]['micro'],
+               tpr[m]['micro'],
+               color=color,
+               linestyle=ls,
+               lw=line_width)
 
 # sub region of the original image
 x1, x2, y1, y2 = 0.0, 0.3, 0.7, 1.0
@@ -303,13 +329,14 @@ for parameter, y_label in zip(parameters,y_labels):
 
         # plot training
         ax = axes[0]
-        ax.plot(epochs, tr_mu, lw=line_width, color=color, markevery=marker_on, marker=marker, label=m[0:m.find("_")])
+        aus_idx = m.find(patter_legend_split)
+        ax.plot(epochs, tr_mu, lw=line_width, color=color, markevery=marker_on, marker=marker, label=m[0:aus_idx])
         ax.fill_between(epochs, tr_mu+tr_std, tr_mu-tr_std, facecolor=color, alpha=alpha_fillin)
         ax.set_title(f'Training {y_label} curves', fontsize=title_font_size)
 
         # plot validation
         ax = axes[1]
-        ax.plot(epochs, val_mu, lw=line_width, color=color, markevery=marker_on, marker=marker, label=m[0:m.find("_")])
+        ax.plot(epochs, val_mu, lw=line_width, color=color, markevery=marker_on, marker=marker, label=m[0:aus_idx])
         ax.fill_between(epochs, val_mu+val_std, val_mu-val_std, facecolor=color, alpha=alpha_fillin)
         ax.set_title(f'Validation {y_label} curves', fontsize=title_font_size)
 
@@ -457,6 +484,24 @@ for metric, values in all_best.items():
     for idx, m in enumerate(values):
         print(f'    {idx} - {m["model"]:56s}: {m["value"]:2.3f}')
     print(f'{"-"*10}\n')
+
+
+##
+from sklearn.metrics import average_precision_score, recall_score, roc_auc_score, f1_score, confusion_matrix, accuracy_score
+
+
+logits_labels = np.zeros([len(test_summary['labels']), 4])
+for i in range(len(test_summary['labels'])):
+    logits_labels[i,test_summary['labels'][i]] = 1
+
+
+precision = average_precision_score(logits_labels,
+                                        test_summary['folds_test_logits_values'][0],
+                                        average='macro')
+
+recall = recall_score(test_summary['labels'],
+                                        np.argmax(test_summary['folds_test_logits_values'][0],-1),
+                                        average='macro')
 
 
 
