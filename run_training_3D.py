@@ -108,6 +108,8 @@ for cv in folds:
     # get the file names for training and validation
     X_train = config['training'][cv]
     X_val = config['validation'][cv]
+    # just to make sure, shuffle again
+    random.shuffle(X_train)
 
     if debug is True:
         # train on 20% of the dataset
