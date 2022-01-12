@@ -181,8 +181,8 @@ test_summary = OrderedDict()
 
 test_summary['model_name'] = config['model_save_name']
 test_summary['labels'] = [int(i) for i in test_fold_summary[0]['ground_truth']]
-test_summary['folds_test_logits_values'] = [test_fold_summary[cv]['prediction'].tolist() for cv in range(config['N_FOLDS'])]
-test_summary['test_time'] = utilities.tictoc_from_time(np.sum([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])]))
+test_summary['folds_test_logits_values'] = [test_fold_summary[cv]['prediction'].tolist() for cv in range(len(folds))]
+test_summary['test_time'] = utilities.tictoc_from_time(np.sum([test_fold_summary[cv]['test_time'] for cv in range(len(folds))]))
 test_summary['test_model_version'] = model_version
 test_summary['test_date'] = time.strftime("%Y%m%d-%H%M%S")
 
@@ -348,8 +348,8 @@ summary = open(os.path.join(model_path,f'{model_version}_model_version_short_tes
 summary.write(f'\nModel Name: {os.path.basename(model_path)}\n\n')
 
 # add test time overall and per image
-average_test_time = np.mean([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])])
-average_test_time_per_image = np.mean([test_fold_summary[cv]['test_time'] for cv in range(config['N_FOLDS'])])/labels.shape[0]
+average_test_time = np.mean([test_fold_summary[cv]['test_time'] for cv in range(len(folds))])
+average_test_time_per_image = np.mean([test_fold_summary[cv]['test_time'] for cv in range(len(folds))])/labels.shape[0]
 summary.write(f'Overall model test time (average over folds): {utilities.tictoc_from_time(average_test_time)}\n')
 summary.write(f'Average test time per image (average over folds): {utilities.tictoc_from_time(average_test_time_per_image)}\n\n')
 
