@@ -810,7 +810,11 @@ def train(self, training_dataloader,
             # saving last model as well
             self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
             self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
-
+            
+            # save model info (but not weights)
+            save_model(self, save_weights=False)
+            
+            # plot last performance
             plotModelPerformance_v2(self.train_loss_history,
                                     self.train_accuracy_history,
                                     self.val_loss_history,
@@ -820,8 +824,6 @@ def train(self, training_dataloader,
                                     self.save_model_path,
                                     best_epoch=self.best_epoch,
                                     display=False)
-            # save model
-            save_model(self)
 
             break
 
@@ -1257,7 +1259,7 @@ def test_independent(model, configuration, test_dataloader):
     # return test predictions
     return test_gt, test_logits, test_stop-test_start
 
-def save_model(self):
+def save_model(self, save_weights=True):
     '''
 
     This functionsaves the model along with its weights and additional
@@ -1270,8 +1272,9 @@ def save_model(self):
     '''
 
     # save model and weights
-    self.model.save(os.path.join(self.save_model_path, 'model'+'.tf'))
-    self.model.save_weights(os.path.join(self.save_model_path, 'model_weights.tf'))
+    if save_weights:
+       self.model.save(os.path.join(self.save_model_path, 'model'+'.tf'))
+       self.model.save_weights(os.path.join(self.save_model_path, 'model_weights.tf'))
 
     # save extra information
     model_summary = {
