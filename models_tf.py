@@ -1969,3 +1969,55 @@ class ViT(object):
         # Create the Keras model.
         self.model = Model(inputs=inputs, outputs=logits)
 
+## Create EfficentNet-B7 model
+
+class EfficientNet_B7(object):
+    '''
+    Imports the EfficientNet_B7 architecture available in tensorflow.
+    The FCN is made by a dense layer of 60 nodes with ReLU activation and dropout, and final softmax.
+    '''
+    def __init__(self, number_of_input_channels,
+                    num_classes,
+                    data_augmentation=True,
+                    class_weights=None,
+                    model_name='EfficientNet_B7',
+                    debug=False):
+
+        self.number_of_input_channels = number_of_input_channels
+        self.num_classes = num_classes
+        self.debug = debug
+        if class_weights is None:
+            self.class_weights = np.ones([1, self.num_classes])
+        else:
+            self.class_weights = class_weights
+        self.model_name = model_name
+
+        inputs = Input(shape=[None, None, self.number_of_input_channels])
+
+        x = utilities_models_tf.augmentor(inputs)
+
+        # import model
+        efficient_net_b7 = tf.keras.applications.EfficientNetB7(include_top=False,
+                                weights=None,
+                                input_tensor=x,
+                                input_shape=(None, None, self.number_of_input_channels))
+        # freeze encoder
+        efficient_net_b7.trainable = False
+        # FCN
+        x = GlobalMaxPooling2D()(efficient_net_b7.output)
+        x = Dropout(rate=0.2)(x)
+        final = Dense(units=self.num_classes, activation='softmax')(x)
+
+        # save model paramenters
+        self.num_filter_start = 'EfficientNet_B7'
+        self.kernel_size = 'EfficientNet_B7'
+        self.depth = 7
+        self.num_filter_per_layer = 'EfficientNet_B7'
+        self.custom_model = False
+
+        # finally make the model and return
+        self.model = Model(inputs=inputs, outputs=final, name=model_name)
+
+        # print model if needed
+        if self.debug is True:
+            print(self.model.summary())
