@@ -200,6 +200,13 @@ for cv in folds:
                         data_augmentation=config['data_augmentation'],
                         class_weights = config['class_weights'],
                         )
+    elif config['model_configuration'] == 'EfficientNet_B7':
+        model = models_tf.EfficientNet_B7(number_of_input_channels = 1,
+                        model_name=config['model_configuration'],
+                        num_classes = len(config['unique_labels']),
+                        data_augmentation=config['data_augmentation'],
+                        class_weights = config['class_weights'],
+                        )
     elif config['model_configuration'] == 'InceptionV3':
         model = models_tf.InceptionV3(number_of_input_channels = 1,
                         model_name=config['model_configuration'],
