@@ -769,8 +769,8 @@ def train(self, training_dataloader,
                 self.best_f1 = self.val_f1_history[-1]
                 self.best_epoch = epoch
 
-                # save model
-                save_model(self)
+                # save model with weights
+                save_model(self, save_weights=True)
 
                 # reset counter
                 n_wait = 0
@@ -782,12 +782,15 @@ def train(self, training_dataloader,
                     n_wait += 1
 
             # check max waiting is reached
-            if n_wait == patience :
+            if n_wait == patience:
                 if self.verbose == 1 or self.verbose == 2:
                     print(' -  Early stopping patient reached. Last model saved in {}'.format(self.save_model_path))
                 # saving last model as well
                 self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
                 self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
+
+                # save model info (but not weights)
+                save_model(self, save_weights=False)
 
                 plotModelPerformance_v2(self.train_loss_history,
                                         self.train_accuracy_history,
@@ -798,8 +801,6 @@ def train(self, training_dataloader,
                                         self.save_model_path,
                                         best_epoch=self.best_epoch,
                                         display=False)
-                # save model
-                save_model(self)
 
                 break
 
@@ -807,13 +808,14 @@ def train(self, training_dataloader,
         if epoch == self.maxEpochs-1:
             if self.verbose == 1 or self.verbose == 2:
                 print(' -  Run through all the epochs. Last model saved in {}'.format(self.save_model_path))
+
             # saving last model as well
             self.model.save(os.path.join(self.save_model_path, 'last_model'+'.tf'))
             self.model.save_weights(os.path.join(self.save_model_path, 'last_model_weights.tf'))
-            
+
             # save model info (but not weights)
             save_model(self, save_weights=False)
-            
+
             # plot last performance
             plotModelPerformance_v2(self.train_loss_history,
                                     self.train_accuracy_history,
