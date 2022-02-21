@@ -54,7 +54,7 @@ log_folder=$working_folder/trained_models_log
 
 declare -a model_configuration=ViT_3D
 
-declare -a classification_type=c13
+declare -a classification_type=c5
 declare -a custom_classification=True
 
 # declare an array variable
@@ -77,7 +77,7 @@ declare -a vit_transformer_layers=2
 save_model_name="$model_configuration"_"$classification_type"_lr"$lr"_pts"$vit_patch_size"_prjd"$vit_projection_dim"_batch"$batchSize"
 python3 -u configure_training.py -wd $working_folder -df $dataset_folder/2D_isotropic_TFR -3d True -tts $dataset_folder/2D_isotropic_TFR/train_test_split.json -mc $model_configuration -norm $normalization -dr $dropout_rate -mn $save_model_name -b $batchSize -ct $classification_type -cct $custom_classification -f $nFolds -l $loss -lr $lr -is 200 200 -vit_ps $vit_patch_size -vit_pd $vit_projection_dim -vit_nh $vit_num_heads -vit_mhu 2048 1024 -vit_tl $vit_transformer_layers -v 2 -db False |& tee $log_folder/$save_model_name.log
 
-python3 -u run_training_3D.py -cf $working_folder/trained_models/$save_model_name/config.json -db False -e 250 -p 100 |& tee -a $log_folder/$save_model_name.log
+python3 -u run_training_3D.py -cf $working_folder/trained_models/$save_model_name/config.json -db False -e 250 -p 250 |& tee -a $log_folder/$save_model_name.log
 
 # test models (best and last)
 python3 -u test_model_3D.py -m $working_folder/trained_models/$save_model_name -d $dataset_folder -mv best |& tee -a $log_folder/$save_model_name.log

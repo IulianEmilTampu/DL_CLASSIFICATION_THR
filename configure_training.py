@@ -66,7 +66,7 @@ parser.add_argument('-v', '--verbose',required=False, help='How much to informat
 parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
 parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
 parser.add_argument('-ctd', '--check_training', required=False, help='If True, checks that none of the test images is in the training/validation set', default=True)
-parser.add_argument('-nivc', '--num_img_per_class_validation', required=False, help='Number of images for each class in the validation set.', default=1000)
+parser.add_argument('-nivc', '--num_img_per_class_validation', required=False, help='Number of images for each class in the validation set.', default=200)
 parser.add_argument('-nmv', '--num_min_volumes_in_validation', required=False, help='Minumim number of volumes from which the validation images are taken from.', default=2)
 
 # VAE arguments
@@ -472,7 +472,7 @@ if debug:
     print('Running in debug mode - using less training/validation data (20000) \n')
     # random.seed(29)
     random.shuffle(train_val_filenames)
-    train_val_filenames = train_val_filenames[0:10000]
+    train_val_filenames = train_val_filenames[0:30000]
 
 train_val_filenames, train_val_labels, per_disease_file_names = utilities.get_organized_files(train_val_filenames,
                     classification_type=classification_type,

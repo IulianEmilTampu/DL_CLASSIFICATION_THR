@@ -2002,7 +2002,7 @@ class EfficientNet_B7(object):
                                 input_tensor=x,
                                 input_shape=(None, None, self.number_of_input_channels))
         # freeze encoder
-        efficient_net_b7.trainable = False
+        # efficient_net_b7.trainable = False
         # FCN
         x = GlobalMaxPooling2D()(efficient_net_b7.output)
         x = Dropout(rate=0.2)(x)

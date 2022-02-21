@@ -63,7 +63,7 @@ declare -a dropout_rate=0.3
 declare -a lr=0.00001
 declare -a loss=wcce
 declare -a ids=weights
-declare -a batchSize=2
+declare -a batchSize=32
 declare -a nFolds=1
 
 
