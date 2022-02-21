@@ -66,7 +66,7 @@ parser.add_argument('-v', '--verbose',required=False, help='How much to informat
 parser.add_argument('-ids', '--imbalance_data_strategy', required=False, help='Strategy to use to tackle imbalance data', default='weights')
 parser.add_argument('-db', '--debug', required=False, help='True if want to use a smaller portion of the dataset for debugging', default=False)
 parser.add_argument('-ctd', '--check_training', required=False, help='If True, checks that none of the test images is in the training/validation set', default=True)
-parser.add_argument('-nivc', '--num_img_per_class_validation', required=False, help='Number of images for each class in the validation set.', default=200)
+parser.add_argument('-nivc', '--num_img_per_class_validation', required=False, help='Number of images for each class in the validation set.', default=1000)
 parser.add_argument('-nmv', '--num_min_volumes_in_validation', required=False, help='Minumim number of volumes from which the validation images are taken from.', default=2)
 
 # VAE arguments
@@ -127,29 +127,29 @@ if vit_transformer_units == None:
     # compute default
     vit_transformer_units = [vit_projection_dim * 2, vit_projection_dim]
 
-# # # # # # # # # parse variables
+# # # # # # # # parse variables
 # working_folder = '/flush/iulta54/Research/P3-OCT_THR/'
-# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/2D_isotropic_TFR'
-# train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/train_test_split.json'
-# model_configuration = 'LightOCT'
-# model_save_name = 'test_fold_setting'
-# classification_type = 'c1'
+# dataset_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL_2D_prj/2D_isotropic_TFR'
+# train_test_split = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL_2D_prj/train_test_split.json'
+# model_configuration = 'M4'
+# model_save_name = f'test_{model_configuration}_2D_prj'
+# classification_type = 'c13'
 # custom_classification = True
 # loss = 'wcce'
-# learning_rate = 0.00001
+# learning_rate = 0.0001
 # dropout_rate = 0.3
 # model_normalization = "BatchNorm"
 # batch_size = 4
 # input_size = [200, 200]
 # num_channels = 2
 # data_augmentation = True
-# N_FOLDS = 7
+# N_FOLDS = 1
 # verbose = 2
 # imbalance_data_strategy = 'weights'
 # kernel_size = [5,5]
 # check_training = False
 # debug = False
-# n_images_per_class = 10
+# n_images_per_class = 20
 # min_n_volumes = 2
 # sparse_3d_dataset = False
 #
@@ -166,7 +166,7 @@ if vit_transformer_units == None:
 #     vit_transformer_layers = 8
 #     vit_transformer_units = None
 #     if vit_transformer_units == None:
-#         # compute default
+#         compute default
 #         vit_transformer_units = [vit_projection_dim * 2, vit_projection_dim]
 
 # check if working folder and dataset folder exist
@@ -372,10 +372,10 @@ if custom_classification:
     '''
 
     # get all files organized based on the more detailed classification (per disease).
-    # Set also a filter for files exclusion besed on the default classifications.
+    # Set also a filter for files exclusion based on the default classifications.
     # By default excluding using the more detailed classification (per disease),
     # but one can be more restrictive and filter out by c1 (normal-vs-diseased)
-    # and c2 (normal-enlarged-shrunk-depleted).3D
+    # and c2 (normal-enlarged-shrunk-depleted).
     # If only filtering on c3, there might be cases where samples are
     # set as, for example, shrunk because belonging to graves but they have
     # large sparse follicles (c2 = 9)
@@ -472,7 +472,11 @@ if debug:
     print('Running in debug mode - using less training/validation data (20000) \n')
     # random.seed(29)
     random.shuffle(train_val_filenames)
+<<<<<<< HEAD
     train_val_filenames = train_val_filenames[0:30000]
+=======
+    train_val_filenames = train_val_filenames[0:35000]
+>>>>>>> e7e8ff7db6f07c97c9ea65a3cdfd9ee11b8dc714
 
 train_val_filenames, train_val_labels, per_disease_file_names = utilities.get_organized_files(train_val_filenames,
                     classification_type=classification_type,
@@ -650,6 +654,7 @@ for c in range(N_FOLDS):
 
 print(f'Cross-validation set. Running a {N_FOLDS}-fold cross validation')
 print(f'Images from the validation set are taken from volumes not in the training sets')
+
 for f in range(N_FOLDS):
     print(f'Fold {f+1}: training on {len(per_fold_train_files[f]):5d} and validation on {len(per_fold_val_files[f]):5d}')
 

@@ -53,8 +53,8 @@ log_folder=$working_folder/trained_models_log
 #  # ################################ TESTING M4 ################################
 #  # ############################################################################
 
-declare -a classification_type=c1
-declare -a custom_classification=False
+declare -a classification_type=c13
+declare -a custom_classification=True
 
 declare -a model_configuration=LightOCT_3D
 

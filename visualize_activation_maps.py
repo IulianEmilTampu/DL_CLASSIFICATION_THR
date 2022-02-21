@@ -51,12 +51,23 @@ args = vars(ap.parse_args())
 ## 1 load folders and information about the model
 # get dataset info from the configuration file
 from_configuration_file = True
+model_version = "best"
+set_to_use = "test"
+
+# get the right model based on the model_version_specification
+if model_version=="best":
+    model_name_version = "model.tf"
+elif model_version=="last":
+    model_name_version = "last_model.tf"
 
 if from_configuration_file:
-    model_name = 'ViT_c1_lr0.0001_pts16_prjd128_heads8_tlayers8_batch128'
-    trained_models_path = '/flush/iulta54/Research/P3-OCT_THR/trained_models'
+    model_name = 'ViT_3D_c3_lr0.00001_pts16_prjd32_batch4'
+    trained_models_path = '/flush/iulta54/Research/P3-OCT_THR/trained_models/3D_models/c3'
     model_path = os.path.join(trained_models_path, model_name)
-    dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning'
+    if "3D" in model_name:
+        dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL_3D'
+    else:
+        dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL'
 
     # load configuration file
     with open(os.path.join(model_path,'config.json')) as json_file:
@@ -72,6 +83,9 @@ if from_configuration_file:
     # some other settings
     crop_size = config['input_size'] # (h, w)
     class_description = ', '.join([str(i)+'='+c for i, c in enumerate(config['label_description'])])
+
+    # 3d model?
+    model_3D = True if len(config["input_size"])==3 else False
 else:
     # specify manually the files to show
     test_img = []
@@ -85,7 +99,7 @@ else:
     # file_names, labels, organized_files = utilities.get_organized_files(file_names, c_type, categorical=False)
 
 # make folder where to save imaes
-save_path = os.path.join(trained_models_path, model_name,"GradCAM")
+save_path = os.path.join(trained_models_path, model_name,f'GradCAM_{set_to_use}')
 pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
 
 ## 2 create dataset we want to use for getting the images to inspect
@@ -94,7 +108,7 @@ importlib.reload(utilities_models_tf)
 
 seed = 29122009
 batch_size = 50
-images_to_show = 10
+images_to_show = 50
 
 # check data coming out of the generators
 debug = False
@@ -102,6 +116,25 @@ show = True
 model_to_check = 0
 
 if debug is True:
+    if model_3D:
+        test_dataset_debug = utilities.TFR_3D_sparse_dataset(test_img,
+                    dataset_type = 'test',
+                    batch_size=50,
+                    buffer_size=100,
+                    crop_size=crop_size)
+        x, y = next(iter(test_dataset_debug))
+        aus_y = y
+        if show == True:
+            y = utilities_models_tf.fix_labels_v2(y.numpy(),
+                        classification_type='c3',
+                        unique_labels=config['unique_labels'],
+                        categorical=False)
+            sample = (x.numpy(), y.numpy())
+            utilities.plot_sparse_volume(sample, which_sample=10)
+
+            utilities.plot_histogram_sparse_volume(sample,which_sample=10)
+
+    else:
         test_dataset_debug = utilities.TFR_2D_dataset(test_img,
                     dataset_type = 'train',
                     batch_size=batch_size,
@@ -110,12 +143,30 @@ if debug is True:
         x, y = next(iter(test_dataset_debug))
         aus_y = y
         if show == True:
-            y = utilities_models_tf.fix_labels_v2(y.numpy(), classification_type='c3', unique_labels=config['unique_labels'], categorical=False)
+            y = utilities_models_tf.fix_labels_v2(y.numpy(),
+                        classification_type='c3',
+                        unique_labels=config['unique_labels'],
+                        categorical=False)
             sample = (x.numpy(), y.numpy())
             utilities.show_batch_2D(sample)
 
-# create generator based on model specifications
-test_dataset = utilities.TFR_2D_dataset(test_img,
+# # # # create generator based on model specifications
+
+if set_to_use == "test":
+    img = test_img
+elif set_to_use == "train":
+    img = tr_img
+elif set_to_use == "validation":
+    img = val_img
+
+if model_3D:
+    test_dataset = utilities.TFR_3D_sparse_dataset(img,
+                dataset_type = 'train',
+                batch_size=1,
+                buffer_size=5000,
+                crop_size=crop_size)
+else:
+    test_dataset = utilities.TFR_2D_dataset(img,
                 dataset_type = 'train',
                 batch_size=batch_size,
                 buffer_size=10000,
@@ -123,8 +174,9 @@ test_dataset = utilities.TFR_2D_dataset(test_img,
 
 ## 3 load model
 # load model
-if os.path.exists(os.path.join(model_path, 'fold_' + str(fold+1), 'model.tf')):
-    model = tf.keras.models.load_model(os.path.join(model_path, 'fold_' + str(fold+1), 'model.tf'), compile=False)
+
+if os.path.exists(os.path.join(model_path, 'fold_' + str(fold+1),model_name_version)):
+    model = tf.keras.models.load_model(os.path.join(model_path, 'fold_' + str(fold+1), model_name_version), compile=False)
 else:
     raise Exception('Model not found')
 
@@ -133,11 +185,19 @@ if debug is True:
     for layer in reversed(model.layers):
         print(layer.name, layer.output_shape)
 
-# deactivate augmentation layer
-model.layers[1].layers[0].horizontal = False
-model.layers[1].layers[0].vertical = False
-model.layers[1].layers[1].upper = 0
-model.layers[1].layers[1].lower = 0
+# deactivate augmentation layer if present
+# find index of Augmentation layer
+idx = [i for i,l in enumerate(model.layers) if l.name == "Augmentation"]
+if idx:
+    idx = idx[0]
+    model.layers[idx].layers[0].horizontal = False
+    model.layers[idx].layers[0].vertical = False
+    model.layers[idx].layers[1].height_factor = 0
+    model.layers[idx].layers[1].height_lower = 0
+    model.layers[idx].layers[1].height_upper = 0
+    model.layers[idx].layers[2].factor = 0
+    model.layers[idx].layers[2].lower = 0
+    model.layers[idx].layers[2].upper = 0
 
 ##  compute model predicion on images until reached the number to show
 images = []
@@ -165,6 +225,10 @@ for x, y in test_dataset:
         break
 
 images = np.array(images)
+
+# # # # # # augment image in case
+# images = utilities_models_tf.augmentor(images)
+
 labels = np.argmax(labels.numpy(), axis=-1)
 # pred_logits = np.argmax(pred_logits.numpy(), axis=-1)
 
@@ -187,33 +251,49 @@ if debug is True:
     n_images = 1
 
 if "ViT" in config["model_configuration"]:
-    # get the last normalization layer
-    for layer in reversed(model.layers):
-        if "layer_normalization" in layer.name:
-            name_layers = [layer.name]
-            break
-else:
-    print('Looking for conv layers name...')
     name_layers = []
+    # get the last normalization layer
     for layer in model.layers:
-        if 'conv' in layer.name:
-            # in VAE there are transpose convolutions, we don't need those
-            if 'transpose' not in layer.name:
-                # since ResNet layers are all named convX_blockY_type(conv, bn, relu)
-                # here we check that we are only taking the actuall conv layers
-                if 'block' in layer.name:
-                    # here we are looking at a block of layers, only take the conv one
-                    if layer.name[-4::]=='conv':
+        if "layer_normalization" in layer.name:
+            name_layers.append(layer.name)
+else:
+    name_layers = []
+    if model_3D:
+        print('Looking for 2D conv layers...')
+        for layer in model.layers:
+            if 'conv' in layer.name:
+                # in VAE there are transpose convolutions, we don't need those
+                if 'transpose' not in layer.name:
+                    # since ResNet layers are all named convX_blockY_type(conv, bn, relu)
+                    # here we check that we are only taking the actuall conv layers
+                    if 'block' in layer.name:
+                        # here we are looking at a block of layers, only take the conv one
+                        if layer.name[-4::]=='conv':
+                            name_layers.append(layer.name)
+                    elif 'conv3d' in layer.name:
+                        # here no conv blocks
                         name_layers.append(layer.name)
-                elif 'conv2d' in layer.name:
-                    # here no conv blocks
-                    name_layers.append(layer.name)
+    else:
+        print('Looking for 2D conv layers...')
+        for layer in model.layers:
+            if 'conv' in layer.name:
+                # in VAE there are transpose convolutions, we don't need those
+                if 'transpose' not in layer.name:
+                    # since ResNet layers are all named convX_blockY_type(conv, bn, relu)
+                    # here we check that we are only taking the actuall conv layers
+                    if 'block' in layer.name:
+                        # here we are looking at a block of layers, only take the conv one
+                        if layer.name[-4::]=='conv':
+                            name_layers.append(layer.name)
+                    elif 'conv2d' in layer.name:
+                        # here no conv blocks
+                        name_layers.append(layer.name)
 
 print('Found {} layers -> {}'.format(len(name_layers), name_layers))
 
 ## Whick layer to show. if None, all will be displayed. This is useful when
 # looking at large models with many layers
-
+importlib.reload(utilities)
 conv_to_show = None
 # conv_to_show = [-4,-3,-2,-1]
 
@@ -233,9 +313,9 @@ for i in range(images.shape[0]):
     heatmap_rgb.append([])
     for nl in name_layers:
         if "ViT" in config["model_configuration"]:
-            cam = utilities.gradCAM(model, c, layerName=nl, ViT=True, debug=False)
+            cam = utilities.gradCAM(model, c, layerName=nl, ViT=True, is_3D=model_3D,  debug=False)
         else:
-            cam = utilities.gradCAM(model, c, layerName=nl, debug=False)
+            cam = utilities.gradCAM(model, c, layerName=nl, is_3D=model_3D, debug=False)
         aus_raw, aus_rgb = cam.compute_heatmap(image)
         heatmap_raw[i].append(aus_raw)
         heatmap_rgb[i].append(aus_rgb)
@@ -261,7 +341,13 @@ for i in range(n_images):
             break
 
         # original image
-        axes[j, 0].imshow(np.squeeze(images[idx]), cmap='gray', interpolation=None)
+        if model_3D:
+            # plot the middle images
+            original_image = np.squeeze(images[idx])[:,:,images.shape[3]//2]
+        else:
+            original_image = np.squeeze(images[idx,:,:,0])
+
+        axes[j, 0].imshow(original_image, cmap='gray', interpolation=None)
         if labels[idx] == np.argmax(pred_logits[idx]):
             axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx],np.argmax(pred_logits[idx])), color='g')
         else:
@@ -316,9 +402,9 @@ for i in range(images.shape[0]):
     heatmap_rgb.append([])
     for j in range(len(config["unique_labels"])):
         if "ViT" in config["model_configuration"]:
-            cam = utilities.gradCAM(model, j, layerName=nl, ViT=True, debug=False)
+            cam = utilities.gradCAM(model, j, layerName=nl, ViT=True, is_3D=model_3D, debug=False)
         else:
-            cam = utilities.gradCAM(model, j, layerName=nl, debug=False)
+            cam = utilities.gradCAM(model, j, layerName=nl, is_3D=model_3D, debug=False)
         aus_raw, aus_rgb = cam.compute_heatmap(image)
         heatmap_raw[i].append(aus_raw)
         heatmap_rgb[i].append(aus_rgb)
@@ -326,7 +412,7 @@ print('Done.')
 
 # set-up number of images to plot and number of classes to show
 n_samples_per_image = 5
-classes_to_show = [0,1]
+classes_to_show = [i for i in range(len(config["unique_labels"]))]
 if not classes_to_show:
     classes_to_show = [x for x in range(len(unique_labels))]
 
@@ -358,7 +444,14 @@ for i in range(n_images):
             break
 
         # original image
-        axes[j, 0].imshow(np.squeeze(images[idx]), cmap='gray', interpolation=None)
+        if model_3D:
+            # plot the middle images
+            original_image = np.squeeze(images[idx])[:,:,images.shape[3]//2]
+        else:
+            original_image = np.squeeze(images[idx,:,:,0])
+
+        axes[j, 0].imshow(original_image, cmap='gray', interpolation=None)
+
         if labels[idx] == np.argmax(pred_logits[idx]):
             axes[j, 0].set_title('gt {} - pred {}'.format(labels[idx],np.argmax(pred_logits[idx])), color='g')
         else:
@@ -427,20 +520,20 @@ if save is not True:
 #
 # plt.show()
 
-## 4.4 - PLOT VAE ENCODED DISCTIBUTION
-from mpl_toolkits.mplot3d import Axes3D
-def plot_label_clusters(vae, data, labels):
-    # display a 2D plot of the digit classes in the latent space
-    z_mean, _, _, _, _, _ = model(data)
-    fig = plt.figure(figsize=(12, 10))
-    ax = Axes3D(fig)
-    ax.scatter(z_mean[:, 15], z_mean[:, 65],z_mean[:, 120], c=labels)
-    ax.set_xlabel("z[0]")
-    ax.set_ylabel("z[1]")
-    plt.show()
-
-if 'VAE' in model_name:
-    plot_label_clusters(model, images.numpy(), labels.numpy().tolist())
+# ## 4.4 - PLOT VAE ENCODED DISCTIBUTION
+# from mpl_toolkits.mplot3d import Axes3D
+# def plot_label_clusters(vae, data, labels):
+#     # display a 2D plot of the digit classes in the latent space
+#     z_mean, _, _, _, _, _ = model(data)
+#     fig = plt.figure(figsize=(12, 10))
+#     ax = Axes3D(fig)
+#     ax.scatter(z_mean[:, 15], z_mean[:, 65],z_mean[:, 120], c=labels)
+#     ax.set_xlabel("z[0]")
+#     ax.set_ylabel("z[1]")
+#     plt.show()
+#
+# if 'VAE' in model_name:
+#     plot_label_clusters(model, images.numpy(), labels.numpy().tolist())
 
 
 

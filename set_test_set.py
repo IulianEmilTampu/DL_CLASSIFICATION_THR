@@ -97,10 +97,18 @@ def count_class_files(file_name, class_counter, b_scans):
 
     return class_counter
 
+def count_files(file_list, search_key):
+    '''
+    Utility that given a list of files, counts how mani files have the string
+    search_key in it.
+    '''
+    aus = [search_key in f for f in file_list]
+    return np.sum(np.array(aus))
+
 ## load the annotation_information.csv file
 
-dataset_specs = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/raw_data/annotation_information.csv'
-dataset_folder ='/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/2D_anisotropic_TFR'
+dataset_specs = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/annotation_information.csv'
+dataset_folder ='/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/2D_isotropic_TFR'
 
 volumes = []
 # get only file names without extension
@@ -126,7 +134,8 @@ with open(dataset_specs) as csvfile:
         sample = row[0]
         scan_code = row[1]
         classification_name = row[2]
-        bscans = int(row[11])
+        # bscans = int(row[11])
+        bscans = count_files(files, scan_code)
         # infere label for the different classes based on the name
         c1 = int(classification_name[classification_name.find('c1')+3])
         c2 = int(classification_name[classification_name.find('c2')+3])
@@ -143,8 +152,8 @@ n_images_per_class = 1000
 min_n_volumes = 2
 
 '''
-This means that the 1000 images for each class need to be coming from at least 2
-separate volumes.
+This means that the n_images_per_class images for each class need to be coming
+from at least min_n_volumes different volumes.
 '''
 
 ## For every type of class, get a shuffled list of the volumes belonging to the class
@@ -187,7 +196,7 @@ for c in classes:
     count = 0
     idx = 0
     per_class_random_volumes[c] = []
-    while count <= n_images_per_class:
+    while not all([count >= n_images_per_class, idx >= min_n_volumes]):
         per_class_random_volumes[c].append(volumes[per_class_random_indexes[c][idx]])
         count += volumes[per_class_random_indexes[c][idx]]['n_bscans']
         idx += 1
@@ -265,9 +274,9 @@ print(f'Number of remaining training images: {len(remaining_test_files)}')
 ## save the file in a .json file
 
 json_dict = OrderedDict()
-json_dict['name'] = "2D_OCT_Thyroid_Classification_training_test_split"
+json_dict['name'] = "Sparse_3D_OCT_Thyroid_Classification_training_test_split"
 json_dict['description'] = "Training and testing split for the default classifications"
-json_dict['imageSize'] = "2D"
+json_dict['imageSize'] = "3D"
 json_dict['licence'] = ""
 json_dict['release'] = "1.0"
 json_dict['modality'] = "Spectral_Domain_OCT"
@@ -277,6 +286,6 @@ json_dict['c2_test'] = per_classification_test_files['c2']
 json_dict['c3_test'] = per_classification_test_files['c3']
 json_dict['training'] = remaining_test_files
 
-with open(os.path.join(os.path.dirname(dataset_specs),'train_test_split.json'), 'w') as fp:
+with open(os.path.join(os.path.dirname(dataset_folder),'train_test_split.json'), 'w') as fp:
     json.dump(json_dict, fp)
 
