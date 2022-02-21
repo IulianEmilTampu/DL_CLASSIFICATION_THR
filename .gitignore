@@ -14,5 +14,5 @@ trained_models*/
 *.ods
 
 # skip the bash file for training multiple models (folders where the files are different)
-run_multiple_trainings_*.sh
+#run_multiple_trainings_*.sh
 
