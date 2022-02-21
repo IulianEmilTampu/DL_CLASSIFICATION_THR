@@ -78,13 +78,7 @@ python3 -u test_model.py -m $working_folder/trained_models/$save_model_name -d $
 python3 -u test_model.py -m $working_folder/trained_models/$save_model_name -d $dataset_folder -mv last |& tee -a $log_folder/$save_model_name.log
 
 
->>>>>>> e7e8ff7db6f07c97c9ea65a3cdfd9ee11b8dc714
-
-
 # test models (best and last)
 python3 -u test_model.py -m $working_folder/trained_models/$save_model_name -d $dataset_folder -mv best |& tee -a $log_folder/$save_model_name.log
 python3 -u test_model.py -m $working_folder/trained_models/$save_model_name -d $dataset_folder -mv last |& tee -a $log_folder/$save_model_name.log
-
-
-
 
