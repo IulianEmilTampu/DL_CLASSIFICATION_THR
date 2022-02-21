@@ -43,40 +43,40 @@ import utilities_models_tf
 
 ## get parameters
 
-parser = argparse.ArgumentParser(description='Script that resumes the training of the specified model.')
-parser.add_argument('-d','--dataset_path' ,required=True, help='Provide the path to dataset containing the files specified in the configuration file and used for the initial training.')
-parser.add_argument('-m','--model_path' ,required=True, help='Provide the path to model that one wants to resume training. The expected path is the one where each model fold is located')
-parser.add_argument('-f','--fold' ,required=True, help='Which model of the one available in the different folds to use.')
-parser.add_argument('-cf','--configuration_file' ,required=False, help='Provide the path to the configuration file generated using the configure_training.py script.', default=None)
-parser.add_argument('-r','--overwrite' ,required=True, help='Specify if to overwrite the original model or to save the resumed training model in a separate folder. If False, the resumed model will be saved separately.')
-parser.add_argument('-mv','--model_version' ,required=False, help='Specify which model version to resume training of, the best (best) model or the last (last) model. Default is best', default="best"
-)
-parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 5 epochs).', default=False)
-parser.add_argument('-e','--epocs' ,required=False, help='Set the maximum number of epochs used to train the model Default 200.', default=200)
-parser.add_argument('-p','--patience' ,required=False, help='Set the patiencs for early stopping. Default 25', default=25)
-args = parser.parse_args()
+# parser = argparse.ArgumentParser(description='Script that resumes the training of the specified model.')
+# parser.add_argument('-d','--dataset_path' ,required=True, help='Provide the path to dataset containing the files specified in the configuration file and used for the initial training.')
+# parser.add_argument('-m','--model_path' ,required=True, help='Provide the path to model that one wants to resume training. The expected path is the one where each model fold is located')
+# parser.add_argument('-f','--fold' ,required=True, help='Which model of the one available in the different folds to use.')
+# parser.add_argument('-cf','--configuration_file' ,required=False, help='Provide the path to the configuration file generated using the configure_training.py script.', default=None)
+# parser.add_argument('-r','--overwrite' ,required=True, help='Specify if to overwrite the original model or to save the resumed training model in a separate folder. If False, the resumed model will be saved separately.')
+# parser.add_argument('-mv','--model_version' ,required=False, help='Specify which model version to resume training of, the best (best) model or the last (last) model. Default is best', default="best"
+# )
+# parser.add_argument('-db','--debug' ,required=False, help='Set to True if one wants to run the training in debug mode (only 5 epochs).', default=False)
+# parser.add_argument('-e','--epocs' ,required=False, help='Set the maximum number of epochs used to train the model Default 200.', default=200)
+# parser.add_argument('-p','--patience' ,required=False, help='Set the patiencs for early stopping. Default 25', default=25)
+# args = parser.parse_args()
+#
+# configuration_file = args.configuration_file
+# model_path = args.model_path
+# dataset_path = args.dataset_path
+# model_version = args.model_version
+# fold = args.fold
+# overwrite = args.overwrite == "True"
+# max_epochs = int(args.epocs)
+# patience = int(args.patience)
+# debug = args.debug == "True"
 
-configuration_file = args.configuration_file
-model_path = args.model_path
-dataset_path = args.dataset_path
-model_version = args.model_version
-fold = args.fold
-overwrite = args.overwrite == "True"
-max_epochs = int(args.epocs)
-patience = int(args.patience)
-debug = args.debug == "True"
-
-# # # # # # # # # # # # # # parse variables DEBUG
-# model_path = '/flush/iulta54/Research/P3-OCT_THR/trained_models/test_resume_training'
-# model_version = 'best'
-# dataset_path = "/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL"
-# fold = "1"
-# overwrite = False
-# debug = True
-# max_epochs = 50
-# patience = 50
-# configuration_file = "None"
-# model_3d = False
+# # # # # # # # # # # # # parse variables DEBUG
+model_path = '/flush/iulta54/Research/P3-OCT_RETINAL/trained_models'
+model_version = 'best'
+dataset_path = "/flush/iulta54/Research/Data/OCT/Retinal/Zhang_dataset/original_split"
+fold = "1"
+overwrite = False
+debug = False
+max_epochs = 150
+patience = 150
+configuration_file = "None"
+model_3d = False
 
 
 # check if configuration file is provided, if not use the one of in the model_path
@@ -305,7 +305,7 @@ else:
                     classification_type =config['classification_type'],
                     unique_labels = config['unique_labels'],
                     loss=[config['loss']],
-                    start_learning_rate = config['learning_rate'],
+                    start_learning_rate = config['learning_rate']/10,
                     scheduler = 'constant',
                     power = 0.1,
                     max_epochs=max_epochs,

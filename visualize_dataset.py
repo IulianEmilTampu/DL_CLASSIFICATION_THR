@@ -32,7 +32,7 @@ import utilities_models_tf
 from_configuration_file = True
 
 if from_configuration_file:
-    model_name = 'M4_c6_BatchNorm_dr0.2_lr0.2_wcce_weights'
+    model_name = "M4_c1_BatchNorm_dr0.2_lr0.00001_wcce_weights_batch64"
     trained_models_path = '/flush/iulta54/Research/P3-THR_DL/trained_models'
     dataset_path = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/'
 

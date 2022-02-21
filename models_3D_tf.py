@@ -123,6 +123,78 @@ class LightOCT_3D(object):
         if self.debug is True:
             print(self.model.summary())
 
+## M1_3D
+
+class M1_3D(object):
+    def __init__(self, num_classes,
+                    num_channels=1,
+                    input_size=(None, None, None),
+                    data_augmentation=True,
+                    normalizer=None,
+                    class_weights=None,
+                    kernel_size=(5,5,5),
+                    dropout_rate=0.2,
+                    model_name='M1_3D',
+                    debug=False):
+
+        self.num_channels = num_channels
+        self.num_classes = num_classes
+        self.input_size=input_size
+        self.debug = debug
+        if class_weights is None:
+            self.class_weights = np.ones([1, self.num_classes])
+        else:
+            self.class_weights = class_weights
+        self.model_name = model_name
+        self.kernel_size = kernel_size
+
+        # inputs = Input(shape=self.input_size)
+        inputs = Input(shape=[self.input_size[0],
+                        self.input_size[1],
+                        self.input_size[2],
+                        self.num_channels])
+
+        # [Conv3d-BatchNorm-LeakyRelu-MaxPool]
+        x = layers.Conv3D(filters=8, kernel_size=self.kernel_size, padding='same')(inputs)
+        x = layers.BatchNormalization()(x)
+        x = layers.LeakyReLU()(x)
+        x = layers.MaxPool3D()(x)
+        x = layers.SpatialDropout3D(rate=dropout_rate)(x)
+
+        x = layers.Conv3D(filters=32, kernel_size=self.kernel_size, padding='same')(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.LeakyReLU()(x)
+        x = layers.MaxPool3D()(x)
+
+
+        # compress the 3D volume into a 2D image
+        x = layers.Conv3D(filters=1, kernel_size=(1,1,1))(x)
+        x = layers.Conv2D(filters=128, kernel_size=(1,1))(tf.squeeze(x, axis=-1))
+
+
+        # flatten and then classifier (Flatten makes the model too large. Using
+        # Global average pooling instead - bonus of using None as input size)
+        # x = layers.Flatten()(x)
+        x = layers.GlobalAveragePooling2D()(x)
+
+        # classifier
+        x = layers.Dense(units=256)(x)
+        x = layers.Dropout(rate=dropout_rate)(x)
+        final = Dense(units=self.num_classes, activation='softmax')(x)
+
+        # finally make the model and return
+        self.model = Model(inputs=inputs, outputs=final, name=model_name)
+
+        # save model paramenters
+        self.num_filter_start = 8
+        self.depth = 2
+        self.num_filter_per_layer = [8, 32, 128]
+        self.custom_model = False
+
+        # print model if needed
+        if self.debug is True:
+            print(self.model.summary())
+
 ## ViT model working
 class ViT_3D(object):
     def __init__(self, num_image_in_sequence,

@@ -299,10 +299,10 @@ What we need to parce is
 
 # parse variables
 data_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/raw_data'
-destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/NEW_TFR'
+destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL'
 spatial_size = [1.4, 2.0]
 isotropic_res = 0.007
-dataset_specs = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/raw_dataannotation_information.csv'
+dataset_specs = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/annotation_information.csv'
 
 
 
@@ -475,7 +475,8 @@ for counter, f in enumerate(files):
                 'image' : _bytes_feature(serialize_array(b_scan)),
                 'label_c1' : _int64_feature(int(f['c1'])),
                 'label_c2' : _int64_feature(int(f['c2'])),
-                'label_c3' : _int64_feature(int(f['c3']))
+                'label_c3' : _int64_feature(int(f['c3'])),
+                'file_name': _bytes_feature(serialize_array(file_name))
                 }
         # wrap feature with the Example class
         tf_example = tf.train.Example(features=tf.train.Features(feature=feature))
@@ -516,7 +517,8 @@ for counter, f in enumerate(files):
                 'image' : _bytes_feature(serialize_array(b_scan)),
                 'label_c1' : _int64_feature(int(f['c1'])),
                 'label_c2' : _int64_feature(int(f['c2'])),
-                'label_c3' : _int64_feature(int(f['c3']))
+                'label_c3' : _int64_feature(int(f['c3'])),
+                'file_name': _bytes_feature(serialize_array(file_name))
                 }
         # wrap feature with the Example class
         tf_example = tf.train.Example(features=tf.train.Features(feature=feature))

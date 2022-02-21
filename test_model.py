@@ -48,7 +48,7 @@ import utilities_models_tf
 parser = argparse.ArgumentParser(description='Script that prints a summary of the model perfomance.')
 parser.add_argument('-m','--model_path' ,required=True, help='Specify the folder where the trained model is located')
 parser.add_argument('-d','--dataset_path' ,required=False, help='Specify where the dataset is located', default=False)
-parser.add_argument('-mv','--model_version' ,required=False, help='Specify if to run the training on the best model (best) or the last (last) (ensamble not yet implemented)', default="best")
+parser.add_argument('-mv','--model_version' ,required=False, help='Specify if to run the training on the best model (best) or the last (last)', default="best")
 args = parser.parse_args()
 
 model_path = args.model_path
@@ -189,6 +189,7 @@ test_summary['test_date'] = time.strftime("%Y%m%d-%H%M%S")
 # ############ plot and save confucion matrix
 ensemble_pred_argmax = []
 ensemble_pred_logits = []
+
 # compute ensemble
 # compute the logits mean along the folds
 ensemble_pred_logits = np.array(test_summary['folds_test_logits_values']).mean(axis=0)
@@ -266,7 +267,7 @@ from sklearn.metrics import average_precision_score, recall_score, roc_auc_score
 def get_metrics(true_logits, pred_logits, average='macro'):
     '''
     Utility that given confusion matrics, returns a dictionary containing:
-    tptnfpfn : overall TP, TN, FP, FN values for each of the classes
+    tp tn fp fn : overall TP, TN, FP, FN values for each of the classes
     precision (specificity) : for each of the classes
     recall (sensitivity) : for each of the classes
     f1-score : for each of the classes

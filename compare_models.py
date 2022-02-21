@@ -64,7 +64,10 @@ def get_models_to_compare(models_path, models_to_include=None, get_model_version
         if models_to_include:
             # use this to find the models
             for m in models_to_include:
-                models.append(os.path.basename(glob.glob(os.path.join(models_path, f'{m}*'))[0]))
+                try:
+                    models.append(os.path.basename(glob.glob(os.path.join(models_path, f'{m}*'))[0]))
+                except:
+                    print(f'No model found to match {m}. Skipping...')
         else:
             # get all the folders in models_path
             models = [os.path.basename(os.path.dirname(m)) for m in glob.glob(os.path.join(models_path, '*/'))]
@@ -84,10 +87,20 @@ def get_models_to_compare(models_path, models_to_include=None, get_model_version
                         # now open the .txt file and read the information about the ensamble metrics
                         summary_file = open(version_dict[key]['path_file'], 'r')
                         lines = summary_file.readlines()
-                        # the last line has the information about the overall metrics.
-                        # The accuracy is the third element and auc is the last
-                        version_dict[key]['ensamble_auc'] = float(lines[-1].split()[-1])
-                        version_dict[key]['ensamble_acc'] = float(lines[-1].split()[-3])
+                        # handle campatibility with old test summary
+                        if len(lines) == 1:
+                            # Old summary are less descriptive and all the information is in one line.
+                            # This is a string descriptive of a disctionary, thus convert to dictionary
+                            aus_dict = json.loads(lines[0])
+                            version_dict[key]['ensamble_acc'] = aus_dict['accuracy']/100
+                        else:
+                            # the last line has the information about the overall metrics.
+                            # The accuracy is the third element and auc is the last
+                            try:
+                                version_dict[key]['ensamble_auc'] = float(lines[-1].split()[-1])
+                                version_dict[key]['ensamble_acc'] = float(lines[-1].split()[-3])
+                            except:
+                                print(f'Model {m}: failed to read the {key} test summary')
 
                 # now compare best and last and get model version
                 if version_dict['best']['ensamble_acc'] > version_dict['last']['ensamble_acc']:
@@ -119,23 +132,25 @@ def get_models_to_compare(models_path, models_to_include=None, get_model_version
 
 # ############ for debug
 
-trained_model_path = "/flush/iulta54/Research/P3-OCT_CLASSIFICATION_summary_trained_models/BT/5_folds"
+trained_model_path = "/flush/iulta54/Research/P3-OCT_DATASET_summary_trained_models/BT"
 
 automatic_check = True
 
 if automatic_check:
-    models_to_include = ['LightOCT', 'ResNet50', 'M4', 'M6', 'ViT']
+    # models_to_include = ['LightOCT', 'ResNet50', 'M4', 'M6', 'ViT']
+    models_to_include = ['per-image','per-volume\subject']
     models, model_versions = get_models_to_compare(trained_model_path, models_to_include=models_to_include, get_model_version=True)
+
+    for m, mv in zip(models, model_versions):
+        print(f'{m}: version {mv}')
 else:
     # manual input
-    models = ["LightOCT_per_volume_split_folds5_lr0.0001_batch64_AIIMS",
-            "ResNet50_per_volume_split_folds5_lr0.00001_batch32_AIIMS",
-            "M4_per_volume_split_folds5_lr0.0001_batch16_AIIMS",
-            "M6_per_volume_split_folds5_lr0.00001_batch8_AIIMS",
-            "ViT_per_volume_split_folds5_lr0.0001_pts16_prjd32_batch32_AIIMS",
+    models = ["LightOCT_original_split_CC_lr0.0001_wcce_none_batch64_originalSplit_500epochs",
+                "LightOCT_per_image_split_CC_5_folds_lr0.0001_batch64_retinal",
+                "LightOCT_per_volume_split_CC_5_folds_lr0.0001_batch64_retinal"
             ]
 
-    model_versions = ["last", "last", 'best', 'best', 'last']
+    model_versions = ["best", "best", 'best', 'best', 'last']
 
 test_file_names = [f'{mv}_model_version_test_summary.txt' for mv in model_versions]
 
@@ -180,11 +195,12 @@ for m, tfm in zip(models,test_file_names):
 tick_font_size=20
 title_font_size=20
 label_font_size=25
+csfont = {'fontname':'Times New Roman'}
 # legend_font_size="xx-large"
 legend_font_size="x-large"
 line_width=2
 save = True
-patter_legend_split = '_'
+patter_legend_split = '_folds5'
 mml = np.max([len(i[0:i.find(patter_legend_split)]) for i in models])
 plot_zoomedin = True
 
@@ -197,14 +213,24 @@ line_styles = cycle(list_styles)
 fig, ax = plt.subplots(figsize=(10,10))
 colors = cycle(list_colors)
 line_styles = cycle(list_styles)
+legend_labels = [m[0:m.find(patter_legend_split)].replace('_', ' ').replace('\\','/') for m in models]
+mml = np.max([len(l) for l in legend_labels])
 for m, color, ls in zip(models, colors, line_styles):
     aus_idx = m.find(patter_legend_split)
+    # only for dataset split
+    legend_label = m[0:aus_idx].replace('_', ' ').replace('\\','/')
+    # for AIIMS dataset
+    if 'per-image' in m:
+        fpr[m]['macro'].insert(0,0)
+        tpr[m]['macro'].insert(0,0)
+
     ax.plot(fpr[m]['macro'],
             tpr[m]['macro'],
             color=color,
             linestyle=ls,
             lw=line_width,
-            label=f'{m[0:aus_idx]:{mml+1}s}(AUC:{roc_auc[m]["macro"]:0.3f}, F1:{f1[m]["macro"]:0.3f}, ACC:{acc[m]/100:0.3f})')
+            label=f'{legend_label:{mml+1}s}(AUC:{roc_auc[m]["macro"]:0.4f}, F1:{f1[m]["macro"]:0.3f}, ACC:{acc[m]/100:0.3f})')
+            # f'{m[0:aus_idx]:{mml+1}s}(AUC:{roc_auc[m]["macro"]:0.4f}, F1:{f1[m]["macro"]:0.3f}, ACC:{acc[m]/100:0.3f})'
 
 ax.plot([0, 1], [0, 1], 'k--', lw=line_width)
 major_ticks = np.arange(0, 1.1, 0.1)
@@ -213,15 +239,20 @@ ax.set_xticks(major_ticks)
 ax.set_xticks(minor_ticks, minor=True)
 ax.set_yticks(major_ticks)
 ax.set_yticks(minor_ticks, minor=True)
-ax.set_xlim([0.0, 1.0])
-ax.set_ylim([0.0, 1.0])
+
+# For AIIMS
+ax.set_xlim([0.0-0.01, 1.0])
+ax.set_ylim([0.0, 1.0+0.01])
+
+# ax.set_xlim([0.0, 1.0])
+# ax.set_ylim([0.0, 1.0])
 ax.tick_params(labelsize=tick_font_size)
 plt.grid(color='b', linestyle='-.', linewidth=0.1, which='both')
 
 
 ax.set_xlabel('False Positive Rate', fontsize=label_font_size)
 ax.set_ylabel('True Positive Rate', fontsize=label_font_size)
-ax.set_title('Comparison multi-class ROC - macro-average', fontsize=title_font_size)
+ax.set_title('Comparison multi-class ROC - macro-average', fontsize=title_font_size, **csfont)
 ax.legend(loc="lower right", prop={'family': 'monospace'})
 plt.setp(ax.get_legend().get_texts(), fontsize=legend_font_size)
 
@@ -229,18 +260,29 @@ plt.setp(ax.get_legend().get_texts(), fontsize=legend_font_size)
 if plot_zoomedin:
     colors = cycle(list_colors)
     line_styles = cycle(list_styles)
-    axins = zoomed_inset_axes(ax, zoom=2.5, loc=7, bbox_to_anchor=(0,0,0.99,0.9), bbox_transform=ax.transAxes)
+    axins = zoomed_inset_axes(ax, zoom=2.5, loc=7, bbox_to_anchor=(0.1,-0.01,0.99,0.9), bbox_transform=ax.transAxes)
     for m, color, ls in zip(models, colors, line_styles):
+        # for AIIMS dataset
+        if 'per-image' in m:
+            fpr[m]['macro'].insert(0,0)
+            tpr[m]['macro'].insert(0,0)
+
         axins.plot(fpr[m]['macro'],
-                tpr[m]['macro'],
-                color=color,
-                linestyle=ls,
-                lw=line_width)
+                    tpr[m]['macro'],
+                    color=color,
+                    linestyle=ls,
+                    lw=line_width)
 
     # sub region of the original image
     x1, x2, y1, y2 = 0.0, 0.15, 0.85, 1.0
-    axins.set_xlim(x1, x2)
-    axins.set_ylim(y1, y2)
+
+    # for AIIMS
+    axins.set_xlim(x1-0.01, x2)
+    axins.set_ylim(y1, y2+0.01)
+
+    # axins.set_xlim(x1, x2)
+    # axins.set_ylim(y1, y2)
+
     axins.grid(color='b', linestyle='--', linewidth=0.1)
 
     axins.set_xticks(np.linspace(x1, x2, 4))
@@ -305,8 +347,8 @@ if plot_zoomedin:
 
     # sub region of the original image
     x1, x2, y1, y2 = 0.0, 0.15, 0.85, 1.0
-    axins.set_xlim(x1, x2)
-    axins.set_ylim(y1, y2)
+    axins.set_xlim(x1-0.01, x2)
+    axins.set_ylim(y1, y2+0.01)
     axins.grid(color='b', linestyle='--', linewidth=0.1)
 
     axins.set_xticks(np.linspace(x1, x2, 4))
