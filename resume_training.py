@@ -433,8 +433,8 @@ for m in fold_dict:
 
         model = ModelWrapper(tf_model, config, previous_training_summary)
 
-# check if model is 3D
-model_3D = True if len(config["input_size"])>2 else False
+    # check if model is 3D
+    model_3D = True if len(config["input_size"])>2 else False
 
 ## create data generator
     print('- Creating datasets...')
