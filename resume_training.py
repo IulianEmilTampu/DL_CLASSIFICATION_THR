@@ -157,7 +157,7 @@ else:
             aus['model_version_name'] = mv_name
             aus['build_model'] = True
             aus['model_path'] = aus_model_path
-            aus['model_summary_file'] = model_summary_file
+            aus['model_summary_file'] = None
             aus['trained_epochs'] = 0
 
             # save info
