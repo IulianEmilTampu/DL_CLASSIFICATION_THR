@@ -227,9 +227,20 @@ for m in fold_dict:
                 # update configuration file path
                 new_configuration_file = os.path.join(os.path.dirname(save_path),"config.json")
         else:
-            # model will be initialize so no need to copy, but update save_path
+            # model will be initialize so no need to copy, but update save_path and copy the configuration file
             save_path = os.path.join(os.path.dirname(model_path),f'resumed_{os.path.basename(model_path)}',m["fold"])
             pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+
+            # copy configuration file
+            try:
+                shutil.copy(configuration_file, os.path.dirname(save_path))
+                # update configuration file path
+                new_configuration_file = os.path.join(os.path.dirname(save_path),"config.json")
+            except:
+                os.remove(os.path.join(os.path.dirname(save_path), "config.json"))
+                shutil.copy(configuration_file, os.path.dirname(save_path))
+                # update configuration file path
+                new_configuration_file = os.path.join(os.path.dirname(save_path),"config.json")
     else:
         save_path = model_path
 
