@@ -193,39 +193,46 @@ else:
 for m in fold_dict:
     # take care of model overwrite or not
     if not overwrite:
-        # create path to for the new model and copy model and configuration file and
-        # update the different paths
-        save_path = os.path.join(os.path.dirname(model_path),f'resumed_{os.path.basename(model_path)}',m["fold"])
-        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
-        # copy model
-        try:
-            shutil.copytree(m["model_path"], os.path.join(save_path, m["model_version_name"]))
-        except:
-            shutil.rmtree(os.path.join(save_path, m["model_version_name"]))
-            shutil.copytree(m["model_path"], os.path.join(save_path, m["model_version_name"]))
-        if m["model_version"] == "best":
-            aus = "model_weights.tf.index"
-            shutil.copy(os.path.join(model_path, m["fold"],"model_weights.tf.index"), save_path)
-        elif  m["model_version"] == "last":
-            aus = "last_model_weights.tf.index"
-        try:
-            shutil.copy(os.path.join(model_path, m["fold"], aus), save_path)
-        except:
-            os.remove(os.path.join(save_path, aus))
-            shutil.copy(os.path.join(model_path, m["fold"], aus), save_path)
+        if not m['build_model']:
+            # the model exists but training needs to restart
+            # create path to for the new model and copy model and configuration file and
+            # update the different paths
+            save_path = os.path.join(os.path.dirname(model_path),f'resumed_{os.path.basename(model_path)}',m["fold"])
+            pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+            # copy model
+            try:
+                shutil.copytree(m["model_path"], os.path.join(save_path, m["model_version_name"]))
+            except:
+                shutil.rmtree(os.path.join(save_path, m["model_version_name"]))
+                shutil.copytree(m["model_path"], os.path.join(save_path, m["model_version_name"]))
+            if m["model_version"] == "best":
+                aus = "model_weights.tf.index"
+                shutil.copy(os.path.join(model_path, m["fold"],"model_weights.tf.index"), save_path)
+            elif  m["model_version"] == "last":
+                aus = "last_model_weights.tf.index"
+            try:
+                shutil.copy(os.path.join(model_path, m["fold"], aus), save_path)
+            except:
+                os.remove(os.path.join(save_path, aus))
+                shutil.copy(os.path.join(model_path, m["fold"], aus), save_path)
 
-        # copy configuration file
-        try:
-            shutil.copy(configuration_file, os.path.dirname(save_path))
-            # update configuration file path
-            new_configuration_file = os.path.join(os.path.dirname(save_path),"config.json")
-        except:
-            os.remove(os.path.join(os.path.dirname(save_path), "config.json"))
-            shutil.copy(configuration_file, os.path.dirname(save_path))
-            # update configuration file path
-            new_configuration_file = os.path.join(os.path.dirname(save_path),"config.json")
+            # copy configuration file
+            try:
+                shutil.copy(configuration_file, os.path.dirname(save_path))
+                # update configuration file path
+                new_configuration_file = os.path.join(os.path.dirname(save_path),"config.json")
+            except:
+                os.remove(os.path.join(os.path.dirname(save_path), "config.json"))
+                shutil.copy(configuration_file, os.path.dirname(save_path))
+                # update configuration file path
+                new_configuration_file = os.path.join(os.path.dirname(save_path),"config.json")
+        else:
+            # model will be initialize so no need to copy, but update save_path
+            save_path = os.path.join(os.path.dirname(model_path),f'resumed_{os.path.basename(model_path)}',m["fold"])
+            pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
     else:
         save_path = model_path
+
 
     # open configuration file
     with open(new_configuration_file) as json_file:
