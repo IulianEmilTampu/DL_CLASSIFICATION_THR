@@ -148,7 +148,21 @@ else:
         mv_name = 'model.tf' if mv == 'best' else 'last_model.tf'
         aus_model_path = os.path.join(model_path,f,mv_name)
         if not os.path.isdir(aus_model_path):
-            raise ValueError(f'Model file not found. Given {aus_model_path}')
+            print(f'Model file not found. Given {aus_model_path}. Reinitializing model')
+            # build fold dictionary used to run model re-training
+            aus = {}
+            aus['fold'] = f
+            aus['fold_index'] = int(f[f.find('_')+1::])-1
+            aus['model_version'] = mv
+            aus['model_version_name'] = mv_name
+            aus['build_model'] = True
+            aus['model_path'] = aus_model_path
+            aus['model_summary_file'] = model_summary_file
+            aus['trained_epochs'] = 0
+
+            # save info
+            fold_dict.append(aus)
+
         else:
             # check that the model_summary_json file is present
             model_summary_file = os.path.join(model_path, f, "model_summary_json.txt")
@@ -480,7 +494,7 @@ for m in fold_dict:
     else:
         utilities_models_tf.train(model,
                         train_dataset, val_dataset,
-                        classification_type =config['classification_type'],
+                        classification_type = config['classification_type'],
                         unique_labels = config['unique_labels'],
                         loss=[config['loss']],
                         start_learning_rate = config['learning_rate'],
