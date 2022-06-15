@@ -10,11 +10,11 @@ Information about how to set up a python environment that runs the code of the p
 
 ## Steps 
 The following will describe the steps for training one of the available models (LightOCT) on 2D thyroid data for one of the classification tasks (binary classification). The main steps are:
-- [Dataset preparation](###Dataset-preparation)
-- [Training configuration](###Training-configuration)
-- [Model training](###Model-training)
-- [Model evaluation](###Model-evaluation)
-- [Plotting results](###Plotting-results)
+- [Dataset preparation](###dataset-preparation)
+- [Training configuration](###training-configuration)
+- [Model training](###model-training)
+- [Model evaluation](###model-evaluation)
+- [Plotting results](###plotting-results)
 
 ### Dataset preparation
 Assuming that the OCT volumes saved as .nii files are saved in *PATH_raw_OCT_volume* and that the .csv file describing the classification of every volume is available (see dataset example). 
