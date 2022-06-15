@@ -1,10 +1,10 @@
-'''
+"""
 Script that given a series of nifti volumes of OCT data, trims the volumes to not
 include to top most part of the volume that is above the glass. Note that the
 volume is trimmed as much as possible to still have 1.4mm in total depth (if there
 is lots of space between the glass top and the tissue, by removing all the glass
 part, the remaining tissue is small and infuences the resampling later on
-introducing of interpolation that we do not want).
+introducing artefacts of interpolation that we do not want).
 
 After the glass top part is removed, each 2D image in the 3D volumes is cropped
 to match the final spatial size. This image is saved as the anisotropic version
@@ -23,8 +23,8 @@ The raw data is assumed to be organized as follows:
 │   ├── ...
 
 The name of the files is important since defines to which class the sample
-belongs in the different classification types (3 for now - bynary, 4 classes and
-5 classes). Samples can not be clastered based on the disease since the same
+belongs in the different classification types (3 for now - bynary, 5 classes and
+7 classes). Samples can not be clastered based on the disease since the same
 disease can be both, for example, shrunk and depleted.
 
 Here is a decription of the file name (TH02_0002_v1_c1_0_c2_3_c3_4):
@@ -74,18 +74,16 @@ This nomenclature adds from the previous the reference to the b-scan in the
 volume (TH02_0001_v1_c1_1_c2_2_c3_5_0003.extension), where the last 4 digits
 (0003) identify the b-scan in the volume
 
-
-Note that spartition between test and train+validation can not be done at this
+Note that partition between test and train+validation can not be done at this
 point since there are volumes that can be classified for some classification
 types but not in others (e.g. abnormal volume (c1 = 0) but unknown disease
-(c3 = 9)). The spartition will be done when running training.
+(c3 = 9)). The spartition will be done when running the training configuration (configure_training.py).
 
 IMPORTANT
 Make sure to use a random number seed to generate the same spartition
 for every run, so that the test data remains the same for all the models trained
 on for a particular classification task.
-'''
-
+"""
 
 import os
 import csv
@@ -102,25 +100,32 @@ import tensorflow as tf
 from datetime import datetime
 from collections import OrderedDict
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # or any {'0', '1', '2'}
 
 ## ausiliary functions
 def tictoc(tic=0, toc=1):
-    '''
+    """
     # Returns a string that contains the number of days, hours, minutes and
     seconds elapsed between tic and toc
-    '''
-    elapsed = toc-tic
+    """
+    elapsed = toc - tic
     days, rem = np.divmod(elapsed, 86400)
     hours, rem = np.divmod(rem, 3600)
     minutes, rem = np.divmod(rem, 60)
     seconds, rem = np.divmod(rem, 1)
-    milliseconds = rem*1000
+    milliseconds = rem * 1000
 
-    return "%2dd:%02dh:%02dm:%02ds:%02dms" % (days, hours, minutes, seconds, milliseconds)
+    return "%2dd:%02dh:%02dm:%02ds:%02dms" % (
+        days,
+        hours,
+        minutes,
+        seconds,
+        milliseconds,
+    )
+
 
 def data_normalization(dataset, quantile=0.995):
-    '''
+    """
     Normalizes the data between [-1,1] using the specified quantile value.
     Note that the data that falls outside the [-1, 1] interval is not clipped,
     thus there will be values outside the normalization interval
@@ -134,16 +139,18 @@ def data_normalization(dataset, quantile=0.995):
     x:          data to normalize
     x_min:      min value based on the specified quantile
     x_max:      max value based on the specified quantile
-    '''
+    """
 
-    x_min = np.quantile(dataset, 1-quantile)
+    x_min = np.quantile(dataset, 1 - quantile)
     x_max = np.quantile(dataset, quantile)
 
-    return 2.0*(dataset.astype('float32') - x_min)/(x_max - x_min) - 1.0
+    return 2.0 * (dataset.astype("float32") - x_min) / (x_max - x_min) - 1.0
+
 
 def resample_image(img, img_res, iso_res):
     from skimage.transform import resize
-    '''
+
+    """
     Returns the isotropic resampled version of an input image.
 
     Parameters
@@ -165,32 +172,34 @@ def resample_image(img, img_res, iso_res):
     1 - From the original size, the original resolution and the isotropic
     resolution infere the final size of the volume
     2 - resample the volume using the skimage.transform.resize function
-    '''
+    """
 
-    final_shape = np.floor( (img.shape * img_res) / iso_res)
-    return resize(img, final_shape, order=3, mode='reflect', anti_aliasing=True)
+    final_shape = np.floor((img.shape * img_res) / iso_res)
+    return resize(img, final_shape, order=3, mode="reflect", anti_aliasing=True)
+
 
 def get_first_glass_enface(volume):
-    '''
+    """
     Returns the index of the first enface slice that shows the glass reflection
     in an OCT volume data.
     INPUT
     volume: OCT volumetric data with axes ordered [z,x,y]
-    '''
+    """
     s = 0
     for i in range(volume.shape[0]):
         # for all the enface slices, check if it is the first glass slide
         intensity_threshold = 85
         n_of_white_pixels = 500
         # arbitrary threshold that identifies the white pixels due to the glass reflection
-        aus = np.sum(np.where( volume[i,:,:] > intensity_threshold ))
+        aus = np.sum(np.where(volume[i, :, :] > intensity_threshold))
         if aus > n_of_white_pixels:
             s = i
             return s
     return s
 
+
 def count_class_files(file_name, class_counter, b_scans):
-    '''
+    """
     Simple utility that adds the number of b-scans to the right class in
     the different classification tasks
 
@@ -208,48 +217,48 @@ def count_class_files(file_name, class_counter, b_scans):
     -----
     class_counter : dict
         Updeted dictionary
-    '''
+    """
 
-    c1 = int(file_name[file_name.find('c1')+3])
-    c2 = int(file_name[file_name.find('c2')+3])
-    c3 = int(file_name[file_name.find('c3')+3])
+    c1 = int(file_name[file_name.find("c1") + 3])
+    c2 = int(file_name[file_name.find("c2") + 3])
+    c3 = int(file_name[file_name.find("c3") + 3])
 
     # count file for each class (long series of if - can be made more elegant)
     # c1
     if c1 == 0:
-        class_counter['c1'][0] += b_scans
+        class_counter["c1"][0] += b_scans
     elif c1 == 1:
-        class_counter['c1'][1] += b_scans
+        class_counter["c1"][1] += b_scans
     else:
-        class_counter['c1'][2] += b_scans
+        class_counter["c1"][2] += b_scans
 
     # c2
     if c2 == 0:
-        class_counter['c2'][0] += b_scans
+        class_counter["c2"][0] += b_scans
     elif c2 == 1:
-        class_counter['c2'][1] += b_scans
+        class_counter["c2"][1] += b_scans
     elif c2 == 2:
-        class_counter['c2'][2] += b_scans
+        class_counter["c2"][2] += b_scans
     elif c2 == 3:
-        class_counter['c2'][3] += b_scans
+        class_counter["c2"][3] += b_scans
     elif c2 == 9:
-        class_counter['c2'][4] += b_scans
+        class_counter["c2"][4] += b_scans
 
     # c3
     if c3 == 0:
-        class_counter['c3'][0] += b_scans
+        class_counter["c3"][0] += b_scans
     elif c3 == 1:
-        class_counter['c3'][1] += b_scans
+        class_counter["c3"][1] += b_scans
     elif c3 == 2:
-        class_counter['c3'][2] += b_scans
+        class_counter["c3"][2] += b_scans
     elif c3 == 3:
-        class_counter['c3'][3] += b_scans
+        class_counter["c3"][3] += b_scans
     elif c3 == 4:
-        class_counter['c3'][4] += b_scans
+        class_counter["c3"][4] += b_scans
     elif c3 == 5:
-        class_counter['c3'][5] += b_scans
+        class_counter["c3"][5] += b_scans
     elif c3 == 9:
-        class_counter['c3'][6] += b_scans
+        class_counter["c3"][6] += b_scans
 
     return class_counter
 
@@ -257,80 +266,129 @@ def count_class_files(file_name, class_counter, b_scans):
 # General functions to convert values to a type compatible to a tf.exampe
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
-    if isinstance(value, type(tf.constant(0))): # if value ist tensor
-        value = value.numpy() # get value of tensor
+    if isinstance(value, type(tf.constant(0))):  # if value ist tensor
+        value = value.numpy()  # get value of tensor
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
+
 def _float_feature(value):
-  """Returns a floast_list from a float / double."""
-  return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
+    """Returns a floast_list from a float / double."""
+    return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
+
 
 def _int64_feature(value):
-  """Returns an int64_list from a bool / enum / int / uint."""
-  return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+    """Returns an int64_list from a bool / enum / int / uint."""
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
 
 def serialize_array(array):
-  array = tf.io.serialize_tensor(array)
-  return array
+    array = tf.io.serialize_tensor(array)
+    return array
 
 
 ## parse inline parameters and check them
-'''
+"""
 What we need to parce is
 - dataset folder where the nifti files are organized in folders based on the sample code
 - destination folder where to save the dataset
 - spatial size [x, y, z] dimensions in mm that the final anisotropic ans isotropic dataset should have
-'''
+"""
 
-# parser = argparse.ArgumentParser(description='Script that prepares the OCT data for deep learning training.')
-# parser.add_argument('-dt','--data', required=True, help='Path to the folder containing the OCT nifti files organized per sample code.')
-# parser.add_argument('-ds', '--destination', required=True, help='Path to where to save the created datasets.')
-# parser.add_argument('-s', '--dataset_specs', required=True, help='Path to the csv file containing the information on which volume to use and their class.')
-# parser.add_argument('-ss','--spatial_size', required=True, nargs='+', help='Final spatial size of the images in mm [depth, lateral].')
-# parser.add_argument('-r','--resolution', required=True, help='Resolution of the isotropic images in mm.')
-# args = parser.parse_args()
-#
-# # parse variables
-# data_folder = args.data
-# destination_folder = args.destination
-# spatial_size = [float(i) for i in args.spatial_size]
-# isotropic_res = float(args.resolution)
-# dataset_specs = args.dataset_specs
+parser = argparse.ArgumentParser(
+    description="Script that prepares the OCT data for deep learning training."
+)
+parser.add_argument(
+    "-dt",
+    "--data",
+    required=True,
+    help="Path to the folder containing the OCT nifti files organized per sample code.",
+)
+parser.add_argument(
+    "-ds",
+    "--destination",
+    required=True,
+    help="Path to where to save the created datasets.",
+)
+parser.add_argument(
+    "-s",
+    "--dataset_specs",
+    required=True,
+    help="Path to the csv file containing the information on which volume to use and their class.",
+)
+parser.add_argument(
+    "-ss",
+    "--spatial_size",
+    required=True,
+    nargs="+",
+    help="Final spatial size of the images in mm [depth, lateral].",
+)
+parser.add_argument(
+    "-r",
+    "--resolution",
+    required=True,
+    help="Resolution of the isotropic images in mm.",
+)
+args = parser.parse_args()
 
 # parse variables
-data_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/raw_data'
-destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL'
-spatial_size = [1.4, 2.0]
-isotropic_res = 0.007
-dataset_specs = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/annotation_information.csv'
+data_folder = args.data
+destination_folder = args.destination
+spatial_size = [float(i) for i in args.spatial_size]
+isotropic_res = float(args.resolution)
+dataset_specs = args.dataset_specs
+
+# # parse variables
+# data_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_refined_DeepLearning/raw_data'
+# destination_folder = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL'
+# spatial_size = [1.4, 2.0]
+# isotropic_res = 0.007
+# dataset_specs = '/flush/iulta54/Research/Data/OCT/Thyroid_2019_DL/annotation_information.csv'
 
 
-
-print('\n\n OCT dataset preparation script (this may take a while depending on the number of files and their size...).\n')
+print(
+    "\n\n OCT dataset preparation script (this may take a while depending on the number of files and their size...).\n"
+)
 
 # ### check if provided folders and variables are ok
 if not os.path.isdir(data_folder):
-    raise TypeError('Invalid data folder. Given {} but the folder does not exist'.format(data_folder))
+    raise TypeError(
+        "Invalid data folder. Given {} but the folder does not exist".format(
+            data_folder
+        )
+    )
 
 if not os.path.isdir(destination_folder):
-    raise TypeError('Invalid destination folder. Given {} but the folder does not exist'.format(destination_folder))
+    raise TypeError(
+        "Invalid destination folder. Given {} but the folder does not exist".format(
+            destination_folder
+        )
+    )
 
 if not os.path.isfile(dataset_specs):
-    raise TypeError('Invalid dataset specification file. Given {} but the file does not exist'.format(dataset_specs))
+    raise TypeError(
+        "Invalid dataset specification file. Given {} but the file does not exist".format(
+            dataset_specs
+        )
+    )
 
 if len(spatial_size) != 2:
-    raise TypeError('The spatial size provided is not correct. Expected 2 values, but only {} were given.'.format(len(spatial_size)))
+    raise TypeError(
+        "The spatial size provided is not correct. Expected 2 values, but only {} were given.".format(
+            len(spatial_size)
+        )
+    )
 
 # #### check if all the files specified in the dataset_specs exist in the data_folder
 # load the names of the volumes and save label information
 files = []
 
-class_volume_counter = {'c1':[0,0,0],
-                        'c2':[0,0,0,0,0],
-                        'c3':[0,0,0,0,0,0,0]
-                        }
+class_volume_counter = {
+    "c1": [0, 0, 0],
+    "c2": [0, 0, 0, 0, 0],
+    "c3": [0, 0, 0, 0, 0, 0, 0],
+}
 with open(dataset_specs) as csvfile:
-    file = csv.reader(csvfile, delimiter=',', skipinitialspace=False)
+    file = csv.reader(csvfile, delimiter=",", skipinitialspace=False)
     # skip header
     next(file)
     # get file information
@@ -340,20 +398,32 @@ with open(dataset_specs) as csvfile:
         classification_name = row[2]
         convention = int(row[3])
         # infere label for the different classes based on the name
-        c1 = int(classification_name[classification_name.find('c1')+3])
-        c2 = int(classification_name[classification_name.find('c2')+3])
-        c3 = int(classification_name[classification_name.find('c3')+3])
-        files.append({'sample':sample, 'scan_code':scan_code, 'file_name':classification_name, 'c1':c1, 'c2':c2, 'c3':c3, 'convention':convention})
+        c1 = int(classification_name[classification_name.find("c1") + 3])
+        c2 = int(classification_name[classification_name.find("c2") + 3])
+        c3 = int(classification_name[classification_name.find("c3") + 3])
+        files.append(
+            {
+                "sample": sample,
+                "scan_code": scan_code,
+                "file_name": classification_name,
+                "c1": c1,
+                "c2": c2,
+                "c3": c3,
+                "convention": convention,
+            }
+        )
 
         # count file for each class (long series of if - can be made more elegant)
-        class_volume_counter = count_class_files(classification_name, class_volume_counter,1)
+        class_volume_counter = count_class_files(
+            classification_name, class_volume_counter, 1
+        )
 
 
 # loop through the files and check if they exist
-missing=[]
+missing = []
 count_file = 0
 for f in files:
-    file_name = os.path.join(data_folder, f['sample'],f['file_name']+'.nii')
+    file_name = os.path.join(data_folder, f["sample"], f["file_name"] + ".nii")
     if not os.path.isfile(file_name):
         missing.append(file_name)
     else:
@@ -361,98 +431,119 @@ for f in files:
 
 # print if some are missing
 if missing:
-    print('Some files specified in the dataset_specification csv file are missing:')
+    print("Some files specified in the dataset_specification csv file are missing:")
     for f in missing:
         print(f)
 else:
-    print('All the files in the dataset_specification csv file were found.')
+    print("All the files in the dataset_specification csv file were found.")
 
 # initiate log file where dataset preparation information is saved for debug
-logfile_path = os.path.join(destination_folder, 'logfile.txt')
+logfile_path = os.path.join(destination_folder, "logfile.txt")
 if os.path.isfile(logfile_path):
     os.remove(logfile_path)
 
-logfile = open(logfile_path, 'a')
-logfile.write('Log file for OCT data preparation. \n')
+logfile = open(logfile_path, "a")
+logfile.write("Log file for OCT data preparation. \n")
 logfile.write(f'Starting at {datetime.now().strftime("%H:%M:%S")}. \n')
-logfile.write('Data and destination folders checked. \n')
-logfile.write('All files specified in the dataset_specification csv file were found. \n')
-logfile.write(f'Files per class and classification type: \n c1: {class_volume_counter["c1"]} \n c2: {class_volume_counter["c2"]} \n c3: {class_volume_counter["c3"]} \n')
+logfile.write("Data and destination folders checked. \n")
+logfile.write(
+    "All files specified in the dataset_specification csv file were found. \n"
+)
+logfile.write(
+    f'Files per class and classification type: \n c1: {class_volume_counter["c1"]} \n c2: {class_volume_counter["c2"]} \n c3: {class_volume_counter["c3"]} \n'
+)
 logfile.close()
 
 start = time.time()
 
 ## remove glass top and reshape volumes to the specified spatial size
 
-class_bscan_counter = {'c1':[0,0,0],
-                       'c2':[0,0,0,0,0],
-                       'c3':[0,0,0,0,0,0,0]
-                        }
+class_bscan_counter = {
+    "c1": [0, 0, 0],
+    "c2": [0, 0, 0, 0, 0],
+    "c3": [0, 0, 0, 0, 0, 0, 0],
+}
 
 for counter, f in enumerate(files):
-    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 1/3 (cropping and resampling)":40s} \r', end='')
+    print(
+        f'Volume {counter+1:3d}/{count_file:3d} - {"step 1/3 (cropping and resampling)":40s} \r',
+        end="",
+    )
 
     # initiate log dictionary
-    log_dict={}
+    log_dict = {}
 
     # open nifti file
-    file_name = os.path.join(data_folder, f['sample'], f['file_name']+ '.nii' )
+    file_name = os.path.join(data_folder, f["sample"], f["file_name"] + ".nii")
     volume_template = nib.load(file_name)
     header = volume_template.header
-    volume_data = volume_template.get_fdata().astype('float32')
+    volume_data = volume_template.get_fdata().astype("float32")
 
     # ## get volume resolutions and find the en-face axes
-    anisotropic_res = np.array(header['pixdim'][1:4])
+    anisotropic_res = np.array(header["pixdim"][1:4])
     if np.argmin(anisotropic_res) == 0:
         # the volume has the convention that FSL uses x (depth), y (A-scan), z (interpolation)
         # transpose the volume to have the specified b-scan as the first two dimensions
-        if int(f['convention']) == 1:
+        if int(f["convention"]) == 1:
             # here using the interpolated b-scan (x, z)
-            volume_data = volume_data.transpose((0,2,1))
-            anisotropic_res = np.array([anisotropic_res[0], anisotropic_res[2], anisotropic_res[1]])
-        elif int(f['convention']) != 2:
-            raise ValueError(f'File convention not recognized. Given {f["convention"]}, expected 1 or 2')
+            volume_data = volume_data.transpose((0, 2, 1))
+            anisotropic_res = np.array(
+                [anisotropic_res[0], anisotropic_res[2], anisotropic_res[1]]
+            )
+        elif int(f["convention"]) != 2:
+            raise ValueError(
+                f'File convention not recognized. Given {f["convention"]}, expected 1 or 2'
+            )
     else:
-        raise ValueError(f'Unrecognized dimension order. Expecting depth as first dimension. Given {resolution}')
+        raise ValueError(
+            f"Unrecognized dimension order. Expecting depth as first dimension. Given {anisotropic_res}"
+        )
 
-    log_dict['Initial_anisotropic_volume_shape'] = volume_data.shape
-    log_dict['Anisotropic_resolution'] = anisotropic_res
+    log_dict["Initial_anisotropic_volume_shape"] = volume_data.shape
+    log_dict["Anisotropic_resolution"] = anisotropic_res
     # ## add the number of b-scans to the right classes
-    class_bscan_counter = count_class_files(f['file_name'], class_bscan_counter, volume_data.shape[-1])
+    class_bscan_counter = count_class_files(
+        f["file_name"], class_bscan_counter, volume_data.shape[-1]
+    )
 
     # ## get the first glass en-face slice position
     s = get_first_glass_enface(volume_data)
 
     # check if the remaining part of the volume has a depth of at least the
     # one specified for the spatial size in z
-    remaining_slides = volume_data.shape[0]- s
-    remaining_depth = remaining_slides*anisotropic_res[0]
+    remaining_slides = volume_data.shape[0] - s
+    remaining_depth = remaining_slides * anisotropic_res[0]
     if remaining_depth < spatial_size[0]:
         # print('Volume {}: leaving some free air'.format(os.path.basename(file_name)))
-        s = volume_data.shape[0] - int(np.ceil(spatial_size[0]/anisotropic_res[0]))
+        s = volume_data.shape[0] - int(np.ceil(spatial_size[0] / anisotropic_res[0]))
         if s < 0:
             s = 0
 
-    log_dict['First_glass_enface_slide'] = s
+    log_dict["First_glass_enface_slide"] = s
 
     # trim the volume to remove glass top
     volume_data = volume_data[s::, :, :]
 
     # crop volume to the spatial size specifications
-    volume_data = volume_data[0:int(np.ceil(spatial_size[0]/anisotropic_res[0])),
-                              0:int(np.ceil(spatial_size[1]/anisotropic_res[1])),
-                              :]
+    volume_data = volume_data[
+        0 : int(np.ceil(spatial_size[0] / anisotropic_res[0])),
+        0 : int(np.ceil(spatial_size[1] / anisotropic_res[1])),
+        :,
+    ]
     # normalise volume in [-1,1] using 98% percentile
     volume_data = data_normalization(volume_data, quantile=0.98)
 
-    log_dict['Final_anisotropic_image_shape'] = volume_data.shape[0:2]
+    log_dict["Final_anisotropic_image_shape"] = volume_data.shape[0:2]
 
     # ## save every 2D anisotropic b-scan as .nii and TFR
-    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 2/3 (saving anisotropic b-scans)":40s}\r', end='')
+    print(
+        f'Volume {counter+1:3d}/{count_file:3d} - {"step 2/3 (saving anisotropic b-scans)":40s}\r',
+        end="",
+    )
 
     # make folders
-    nii_save_folder = os.path.join(destination_folder, '2D_anisotropic')
-    tfr_save_folder = os.path.join(destination_folder, '2D_anisotropic_TFR')
+    nii_save_folder = os.path.join(destination_folder, "2D_anisotropic")
+    tfr_save_folder = os.path.join(destination_folder, "2D_anisotropic_TFR")
     if not os.path.isdir(nii_save_folder):
         os.makedirs(nii_save_folder)
     if not os.path.isdir(tfr_save_folder):
@@ -460,24 +551,28 @@ for counter, f in enumerate(files):
 
     for scan in range(volume_data.shape[-1]):
         # get the b-scan
-        b_scan = volume_data[:,:,scan]
-        file_name = '_'.join([f['file_name'],'%03d' %(scan)])
+        b_scan = volume_data[:, :, scan]
+        file_name = "_".join([f["file_name"], "%03d" % (scan)])
         # save .nii
-        nib.save(nib.Nifti1Image(b_scan, volume_template.affine, volume_template.header),
-            os.path.join(nii_save_folder,  file_name + '.nii'))
+        nib.save(
+            nib.Nifti1Image(b_scan, volume_template.affine, volume_template.header),
+            os.path.join(nii_save_folder, file_name + ".nii"),
+        )
         # save TFR
-        writer =  tf.io.TFRecordWriter(os.path.join(tfr_save_folder,file_name + '.tfrecords'))
+        writer = tf.io.TFRecordWriter(
+            os.path.join(tfr_save_folder, file_name + ".tfrecords")
+        )
         # Creates a tf.Example message ready to be written to a file for all the images
         feature = {
-                'xdim' : _int64_feature(b_scan.shape[0]),
-                'zdim' : _int64_feature(b_scan.shape[1]),
-                'nCh' : _int64_feature(1),
-                'image' : _bytes_feature(serialize_array(b_scan)),
-                'label_c1' : _int64_feature(int(f['c1'])),
-                'label_c2' : _int64_feature(int(f['c2'])),
-                'label_c3' : _int64_feature(int(f['c3'])),
-                'file_name': _bytes_feature(serialize_array(file_name))
-                }
+            "xdim": _int64_feature(b_scan.shape[0]),
+            "zdim": _int64_feature(b_scan.shape[1]),
+            "nCh": _int64_feature(1),
+            "image": _bytes_feature(serialize_array(b_scan)),
+            "label_c1": _int64_feature(int(f["c1"])),
+            "label_c2": _int64_feature(int(f["c2"])),
+            "label_c3": _int64_feature(int(f["c3"])),
+            "file_name": _bytes_feature(serialize_array(file_name)),
+        }
         # wrap feature with the Example class
         tf_example = tf.train.Example(features=tf.train.Features(feature=feature))
         # write to file
@@ -490,11 +585,14 @@ for counter, f in enumerate(files):
         del writer
 
     # ## save every 2D isotropic b-scan as .nii and TFR
-    print(f'Volume {counter+1:3d}/{count_file:3d} - {"step 3/3 (saving isotropic b-scans)":40s}\r', end='')
+    print(
+        f'Volume {counter+1:3d}/{count_file:3d} - {"step 3/3 (saving isotropic b-scans)":40s}\r',
+        end="",
+    )
 
     # make folders
-    nii_save_folder = os.path.join(destination_folder, '2D_isotropic')
-    tfr_save_folder = os.path.join(destination_folder, '2D_isotropic_TFR')
+    nii_save_folder = os.path.join(destination_folder, "2D_isotropic")
+    tfr_save_folder = os.path.join(destination_folder, "2D_isotropic_TFR")
     if not os.path.isdir(nii_save_folder):
         os.makedirs(nii_save_folder)
     if not os.path.isdir(tfr_save_folder):
@@ -502,24 +600,30 @@ for counter, f in enumerate(files):
 
     for scan in range(volume_data.shape[-1]):
         # get the b-scan
-        b_scan = resample_image(volume_data[:,:,scan], anisotropic_res[0:2], isotropic_res)
-        file_name = '_'.join([f['file_name'],'%03d' %(scan)])
+        b_scan = resample_image(
+            volume_data[:, :, scan], anisotropic_res[0:2], isotropic_res
+        )
+        file_name = "_".join([f["file_name"], "%03d" % (scan)])
         # save .nii
-        nib.save(nib.Nifti1Image(b_scan, volume_template.affine, volume_template.header),
-            os.path.join(nii_save_folder,  file_name + '.nii'))
+        nib.save(
+            nib.Nifti1Image(b_scan, volume_template.affine, volume_template.header),
+            os.path.join(nii_save_folder, file_name + ".nii"),
+        )
         # save TFR
-        writer =  tf.io.TFRecordWriter(os.path.join(tfr_save_folder,file_name + '.tfrecords'))
+        writer = tf.io.TFRecordWriter(
+            os.path.join(tfr_save_folder, file_name + ".tfrecords")
+        )
         # Creates a tf.Example message ready to be written to a file for all the images
         feature = {
-                'xdim' : _int64_feature(b_scan.shape[0]),
-                'zdim' : _int64_feature(b_scan.shape[1]),
-                'nCh' : _int64_feature(1),
-                'image' : _bytes_feature(serialize_array(b_scan)),
-                'label_c1' : _int64_feature(int(f['c1'])),
-                'label_c2' : _int64_feature(int(f['c2'])),
-                'label_c3' : _int64_feature(int(f['c3'])),
-                'file_name': _bytes_feature(serialize_array(file_name))
-                }
+            "xdim": _int64_feature(b_scan.shape[0]),
+            "zdim": _int64_feature(b_scan.shape[1]),
+            "nCh": _int64_feature(1),
+            "image": _bytes_feature(serialize_array(b_scan)),
+            "label_c1": _int64_feature(int(f["c1"])),
+            "label_c2": _int64_feature(int(f["c2"])),
+            "label_c3": _int64_feature(int(f["c3"])),
+            "file_name": _bytes_feature(serialize_array(file_name)),
+        }
         # wrap feature with the Example class
         tf_example = tf.train.Example(features=tf.train.Features(feature=feature))
         # write to file
@@ -531,49 +635,53 @@ for counter, f in enumerate(files):
         del tf_example
         del writer
 
-    log_dict['Isotropic_resolution'] = isotropic_res
-    log_dict['Final_isotropic_image_shape'] = b_scan.shape
+    log_dict["Isotropic_resolution"] = isotropic_res
+    log_dict["Final_isotropic_image_shape"] = b_scan.shape
 
     # log info
-    logfile = open(logfile_path, 'a')
+    logfile = open(logfile_path, "a")
     logfile.write(f'Volume {counter+1:3d}/{count_file:3d} - {f["file_name"]} \n')
     for key, values in log_dict.items():
-        logfile.write(' - {}: {}\n'.format(key, values))
-    logfile.write('\n')
+        logfile.write(" - {}: {}\n".format(key, values))
+    logfile.write("\n")
     logfile.close()
 
 ## Save dataset information
-
 json_dict = OrderedDict()
-json_dict['name'] = "2D_OCT_Thyroid_Classification"
-json_dict['description'] = "2D dataset of OCT b-scan images (anisotropic and isotropic) of normal and diseased thyroid tissue"
-json_dict['imageSize'] = "2D"
-json_dict['reference'] = "Tampu et all., Biomedical Optics Express. 2020 Aug 1;11(8):4130-49."
-json_dict['licence'] = ""
-json_dict['release'] = "1.0"
-json_dict['modality'] = "Spectral_Domain_OCT"
+json_dict["name"] = "2D_OCT_Thyroid_Classification"
+json_dict[
+    "description"
+] = "2D dataset of OCT b-scan images (anisotropic and isotropic) of normal and diseased thyroid tissue"
+json_dict["imageSize"] = "2D"
+json_dict[
+    "reference"
+] = "Tampu et all., Biomedical Optics Express. 2020 Aug 1;11(8):4130-49."
+json_dict["licence"] = ""
+json_dict["release"] = "1.0"
+json_dict["modality"] = "Spectral_Domain_OCT"
 
-json_dict['C1_volumes'] = class_volume_counter['c1']
-json_dict['C2_volumes'] = class_volume_counter['c2']
-json_dict['C3_volumes'] = class_volume_counter['c3']
+json_dict["C1_volumes"] = class_volume_counter["c1"]
+json_dict["C2_volumes"] = class_volume_counter["c2"]
+json_dict["C3_volumes"] = class_volume_counter["c3"]
 
-json_dict['C1_bscans'] = class_bscan_counter['c1']
-json_dict['C2_bscans'] = class_bscan_counter['c2']
-json_dict['C3_bscans'] = class_bscan_counter['c3']
+json_dict["C1_bscans"] = class_bscan_counter["c1"]
+json_dict["C2_bscans"] = class_bscan_counter["c2"]
+json_dict["C3_bscans"] = class_bscan_counter["c3"]
 
-with open(os.path.join(destination_folder,'dataset_info.json'), 'w') as fp:
+with open(os.path.join(destination_folder, "dataset_info.json"), "w") as fp:
     json.dump(json_dict, fp)
 
 end = time.time()
 total_time = tictoc(start, end)
 
 # save log information
-logfile = open(logfile_path, 'a')
-logfile.write(f'\n Finished! Dataset creation took {total_time}.\n Dataset can be found at {destination_folder}.')
+logfile = open(logfile_path, "a")
+logfile.write(
+    f"\n Finished! Dataset creation took {total_time}.\n Dataset can be found at {destination_folder}."
+)
 logfile.close()
 
-print('\n')
-print(f'Dataset preparation took {total_time}. It is now available at {destination_folder}')
-
-
-
+print("\n")
+print(
+    f"Dataset preparation took {total_time}. It is now available at {destination_folder}"
+)
