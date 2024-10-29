@@ -20,11 +20,14 @@ Intraoperative guidance tools for thyroid surgery based on optical coherence tom
 - [License](#license)
 
 ## Requirements
-This project was developed in Python. Ensure you have the following libraries installed:
+This project was developed in Python. You can create a conda environment and install dependencies by: (TODO):
 
 ```bash
+conda create -n thr_dl_cl python=3.8 -y
+conda activate thr_dl_cl
 pip install requirements.txt
 ```
+
 ## Usage
 
 ### 1. Dataset Preparation
