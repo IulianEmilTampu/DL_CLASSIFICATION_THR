@@ -1,12 +1,12 @@
 
-# Diseased Thyroid Tissue Classification in OCT Images Using Deep Learning: Towards Surgical Decision Support
+# Diseased thyroid tissue classification in OCT images using deep learning: Towards surgical decision support
 
 This repository contains code for the classification of thyroid tissue in optical coherence tomography (OCT) images using deep learning. This work explores the use of 2D and 3D deep learning models to automatically distinguish between normal and diseased thyroid tissue, providing potential real-time support in surgical settings.
 
 [Journal](https://doi.org/10.1002/jbio.202200227) | [Cite](#reference)
 
 **Abstract**
-Intraoperative guidance tools for thyroid surgery based on optical coherence tomography (OCT) could aid distinguish between normal and diseased tissue. However, OCT images are difficult to interpret, thus, real-time automatic analysis could support the clinical decision-making. In this study, several deep learning models were investigated for thyroid disease classification on 2D and 3D OCT data obtained from ex vivo specimens of 22 patients undergoing surgery and diagnosed with several thyroid pathologies. Additionally, two open-access datasets were used to evaluate the custom models. On the thyroid dataset, the best performance was achieved by the 3D vision transformer model with a Matthew's correlation coefficient (MCC) of 0.79 (accuracy = 0.90) for the normal-versus-abnormal classification. On the open-access datasets, the custom models achieved the best performance (MCC > 0.88, accuracy > 0.96). Results obtained for the normal-versus-abnormal classification suggest OCT, complemented with deep learning-based analysis, as a tool for real-time automatic diseased tissue identification in thyroid surgery.
+Intraoperative guidance tools for thyroid surgery based on optical coherence tomography (OCT) could aid in distinguishing between normal and diseased tissue. However, OCT images are difficult to interpret, thus, real-time automatic analysis could support clinical decision-making. In this study, several deep-learning models were investigated for thyroid disease classification on 2D and 3D OCT data obtained from ex vivo specimens of 22 patients undergoing surgery and diagnosed with several thyroid pathologies. Additionally, two open-access datasets were used to evaluate the custom models. On the thyroid dataset, the best performance was achieved by the 3D vision transformer model with Matthew's correlation coefficient (MCC) of 0.79 (accuracy = 0.90) for the normal-versus-abnormal classification. On the open-access datasets, the custom models achieved the best performance (MCC > 0.88, accuracy > 0.96). Results obtained for the normal-versus-abnormal classification suggest OCT, complemented with deep learning-based analysis, as a tool for real-time automatic diseased tissue identification in thyroid surgery.
 
 **Key highlights:**
 - Real-time analysis potential for surgical support.
@@ -36,10 +36,10 @@ Example command:
 ```bash
 python3 create_dataset.py -dt PATH_raw_OCT_volume -ds PATH_to_destination -s PATH_to_the_csv_file -ss 1.4 2.0 -r 0.07
 ```
-This will create both the anisotropic and isotropic 2D OCT dataset saved as .nii files as well as TRF records in the PATH_to_destination folder. The process can be lengthy depending on the number of raw OCT volumes to process
+This will create both the anisotropic and isotropic 2D OCT datasets saved as .nii files as well as TRF records in the PATH_to_destination folder. The process can be lengthy depending on the number of raw OCT volumes to process
 
 ### 2. Training Configuration
-- Use `configure_training.py` to set up training parameters, such as model type, batch size, learning rate, and training epochs. Use the command below to see al the settings:
+- Use `configure_training.py` to set up training parameters, such as model type, batch size, learning rate, and training epochs. Use the command below to see all the settings:
 ```bash
 python configure_training.py --help
 ```
@@ -48,7 +48,7 @@ python configure_training.py --help
 ```bash
 python configure_training.py -wd PATH_working_folder -df PATH_to_destination/2D_isotropic_TFR -tts PATH_to_destination/2D_isotropic_TFR/train_test_split.json -mc LightOCT -mn TEST_LightOCT -ct c1
 ```
-This will create a config.json file saved in PATH_working_folder/trained_models/TEST_LightOCT containing the information about the model and its configuration as well as the training, validation and testing file names used during model training and evaluation.
+This will create a config.json file saved in PATH_working_folder/trained_models/TEST_LightOCT containing the information about the model and its configuration as well as the training, validation, and testing file names used during model training and evaluation.
 
 ### 3. Model Training
 - Run `run_training.py` for 2D models or `run_training_3D.py` for 3D models to initiate the training process. The run_training scripts use the information available in the config.json file to create the model as well as the data-generators used to load and process the data during training. Use the command below to see al the settings:
@@ -60,10 +60,10 @@ python run_training.py --help
 ```bash
 python run_training.py -cf PATH_working_folder/trained_models/TEST_LightOCT/config.json -e 250 -p 250 
 ```
-During model training, the logs of the training will be displayed in the terminal as well as saved in the PATH_working_folder/trained_models/TEST_LightOCT folder, where for every trained fold, the best model, the last model and training curves are saved.
+During model training, the logs of the training will be displayed in the terminal as well as saved in the PATH_working_folder/trained_models/TEST_LightOCT folder, where for every trained fold, the best model, the last model, and training curves are saved.
 
 ### 4. Model Evaluation
-- Evaluate trained models using `test_model.py` for 2D data or `test_model_3D.py` for 3D data. This will produce evaluation metrics such as accuracy, Matthew's correlation coefficient (MCC), and confusion matrices. Use the command below to see al the settings:
+- Evaluate trained models using `test_model.py` for 2D data or `test_model_3D.py` for 3D data. This will produce evaluation metrics such as accuracy, Matthew's correlation coefficient (MCC), and confusion matrices. Use the command below to see all the settings:
 ```bash
 python test_model.py --help
 ```
@@ -71,7 +71,7 @@ python test_model.py --help
 ```bash
 python test_model.py --model_path PATH_to_trained_model --data_path PATH_dataset_folder
 ```
-This will generate test summary files, plot the confusion matrix of the model ensemble and well as the ROC and PP curve.
+This will generate test summary files, and plot the confusion matrix of the model ensemble as well as the ROC and PP curve.
 
 ### 5. Plotting Results
 Use the following scripts for analysis and visualization:
@@ -94,7 +94,7 @@ The repository is organized as follows:
   - `visualize_dataset.py` and `visualize_activation_maps.py`: Tools for dataset inspection and model activation map visualization.
   - `print_model_performance.py`: Summarizes and outputs model performance metrics.
 
-Additionally, an example of a bach script that uses the above Python scripts that runs training configuration, model training and testing is also provided (`LightOCT.sh`)
+Additionally, an example of a bash script that uses the above Python scripts that runs training configuration, model training, and testing is also provided (`LightOCT.sh`)
 
 ## Citation
 If you use this work, please cite:
