@@ -47,7 +47,7 @@ def fix_labels_v2(labels, classification_type, unique_labels, categorical=True):
         - 2 having images from classes 2, 4, 5
         - 3 having images from class 6
 
-    categorical: if True a categorical verison of the labels is returned.
+    categorical: if True a categorical version of the labels is returned.
                     If False, the labels are returned as a 1D numpy array.
     '''
     # check inputs
@@ -111,8 +111,8 @@ def get_organized_files(file_names, classification_type,
     Utility that given a list of file names using the convention described in
     the create_dataset_v2.py script, returns three things:
     1 - list of files that does not contain the file marked as to be excluded (9)
-    2 - list of labels corresponding to the files above (categprical or not)
-    3 - a dictionary of lists that contains the files organised per aggregation class
+    2 - list of labels corresponding to the files above (categorical or not)
+    3 - a dictionary of lists that contains the files organized per aggregation class
 
     Parameters
     ----------
@@ -124,7 +124,7 @@ def get_organized_files(file_names, classification_type,
     custom : bool
         Specifies if the labels need to be aggregated in a different way from
         default. The default is that every labels is an independent class. If
-        False, the labels will be clastered based on the specifications given in
+        False, the labels will be clustered based on the specifications given in
         the custom_labels. Default is False.
     custom_labels : list
         Specifies the way the labels should be clustered. Used if custom
@@ -137,7 +137,7 @@ def get_organized_files(file_names, classification_type,
         6
         ]
     filter_by : tuple
-        Specifies which of the three classification types to use for fitering
+        Specifies which of the three classification types to use for filtering
         out files if they can not be classified. For example, by setting
         filter_by = ("c1", "c3") files that have 9 in c1 or c3 position will
         be excluded.
@@ -173,7 +173,7 @@ def get_organized_files(file_names, classification_type,
                 raise ValueError(f'Not custom classification was set. classification_type expected to be c1, c2 or c3. Instead was given {classification_type}')
 
     if custom:
-        # set lassification type to c3 to be able to get the last label
+        # set classification type to c3 to be able to get the last label
         classification_type = 'c3'
         # custom label aggregation given, thus checking if custom_labels is given
         if custom_labels:
@@ -231,11 +231,11 @@ def get_organized_files(file_names, classification_type,
 
 There are two main functions here:
 1 - _parse_function -> opens the TFRecord files using the format used during the
-                      creation of the TFRecord files. Whithin this function one
-                      can manuputale the data in the record to prepare the images
+                      creation of the TFRecord files. With this function one
+                      can manipulate the data in the record to prepare the images
                       and the labels used by the model e.g. add extra channels or crop.
 2 - create_dataset -> this looks at all the TFRecords files specified in the dataset
-                      and retrievs, shuffles, buffers the data for the model.
+                      and retrieves, shuffles, buffers the data for the model.
                       One here can even implement augmentation if needed. This
                       returns a dataset that the model will use (image, label) format.
  The hyper-parameters needed for the preparation of the dataset are:
@@ -248,7 +248,7 @@ def _parse_function_2D(proto, crop_size):
   '''
   Parse the TFrecord files. In this function one can change the 'structure' of
   the input or output based on the model requirements. Note that no boolean
-  operators are accepted if the function should be ingluded in the graph.
+  operators are accepted if the function should be included in the graph.
   '''
 
   key_features = {
@@ -328,11 +328,11 @@ def TFR_2D_dataset_withStringName(filepath, dataset_type, batch_size, buffer_siz
 
 There are two main functions here:
 1 - _parse_function -> opens the TFRecord files using the format used during the
-                      creation of the TFRecord files. Whithin this function one
-                      can manuputale the data in the record to prepare the images
+                      creation of the TFRecord files. With this function one
+                      can manipulate the data in the record to prepare the images
                       and the labels used by the model e.g. add extra channels or crop.
 2 - create_dataset -> this looks at all the TFRecords files specified in the dataset
-                      and retrievs, shuffles, buffers the data for the model.
+                      and retrieves, shuffles, buffers the data for the model.
                       One here can even implement augmentation if needed. This
                       returns a dataset that the model will use (image, label) format.
  The hyper-parameters needed for the preparation of the dataset are:
@@ -345,7 +345,7 @@ def _parse_function_sparse_3D(proto, crop_size):
   '''
   Parse the TFrecord files. In this function one can change the 'structure' of
   the input or output based on the model requirements. Note that no boolean
-  operators are accepted if the function should be ingluded in the graph.
+  operators are accepted if the function should be included in the graph.
   '''
 
   key_features = {
@@ -406,7 +406,7 @@ def acc_metric(pred, y):
     '''
     computes the accuracy number of correct classified / total number of samples
     INPUT
-     - pred: numpy array of categoricals [B, H, W, C]
+     - pred: numpy array of categorical [B, H, W, C]
      - y : numpyarray of ground truth. This can be both categorical or
             the argmax of the ground truth categorical [B, H, W] or [B, H, W, C]
     '''
@@ -454,7 +454,7 @@ def tictoc_from_time(elapsed=1):
 
 def plotConfusionMatrix(GT, PRED, classes, Labels=None, cmap=plt.cm.Blues, savePath=None, saveName=None, draw=False):
     '''
-    Funtion that plots the confision matrix given the ground truths and the predictions
+    Function that plots the confusion matrix given the ground truths and the predictions
     '''
     # compute confusion matrix
     cm = confusion_matrix(GT, PRED)
@@ -511,7 +511,7 @@ def plotROC(GT, PRED, classes, savePath=None, saveName=None, draw=False):
     from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
     from mpl_toolkits.axes_grid1.inset_locator import mark_inset
     '''
-    Funtion that plots the ROC curve given the ground truth and the logits prediction
+    Function that plots the ROC curve given the ground truth and the logits prediction
 
     INPUT
     - GT: true labels
@@ -785,7 +785,7 @@ def show_batch_2D(sample_batched, title=None, img_per_row=10):
     Parameters
     ----------
     sample_batch : tuple
-        COntains the actuall images (sample_batch[0]) and their label
+        Contains the actuall images (sample_batch[0]) and their label
         (sample_batch[1]).
     title : str
         Title of the created image
