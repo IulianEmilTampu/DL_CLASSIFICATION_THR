@@ -37,7 +37,7 @@ To create a 2D OCT dataset that can be used for training by this framework, run 
 
 Example command:
 ```bash
-python3 create_dataset.py -dt PATH_raw_OCT_volume -ds PATH_to_destination -s PATH_to_the_csv_file -ss 1.4 2.0 -r 0.07
+python create_dataset.py -dt PATH_raw_OCT_volume -ds PATH_to_destination -s PATH_to_the_csv_file -ss 1.4 2.0 -r 0.07
 ```
 This will create both the anisotropic and isotropic 2D OCT datasets saved as .nii files as well as TRF records in the PATH_to_destination folder. The process can be lengthy depending on the number of raw OCT volumes to process
 
