@@ -23,20 +23,23 @@ from keras.engine import base_layer, base_preprocessing_layer
 from keras import backend
 from keras.utils import control_flow_util
 
+# local imports
+from utilities import fix_labels_v2
+
 ## RandomBrightness layer
 
 class RandomBrightness(base_layer.Layer):
-  """A preprocessing layer which randomly adjusts brightnes during training.
+  """A preprocessing layer which randomly adjusts brightness during training.
   This layer will randomly adjust the brightness of an image or images by a random
   factor. Contrast is adjusted independently for each channel of each image
   during training.
   For an overview and full list of preprocessing layers, see the preprocessing
   [guide](https://www.tensorflow.org/guide/keras/preprocessing_layers).
   Input shape:
-    3D (unbatched) or 4D (batched) tensor with shape:
+    3D (un-batched) or 4D (batched) tensor with shape:
     `(..., height, width, channels)`, in `"channels_last"` format.
   Output shape:
-    3D (unbatched) or 4D (batched) tensor with shape:
+    3D (un-batched) or 4D (batched) tensor with shape:
     `(..., height, width, channels)`, in `"channels_last"` format.
   Attributes:
     max_delta: float, must be non-negative.
@@ -108,81 +111,9 @@ def augmentor(inputs):
             name='Augmentation')
     return aug(inputs)
 
-## labels
-
-def fix_labels_v2(labels, classification_type, unique_labels, categorical=True):
-    '''
-    Prepares the labels for training using the specifications in unique_labels.
-    This was initially done in the data generator, but given that working with
-    TFrecords does not allow some operations, labels have to be fixed here.
-
-    Args:
-    labels : numpy array
-        Contains the labels for each classification type
-    classification_type : str
-        Specifies the classification type as described in the
-        create_dataset_v2.py script.
-    unique_labels (list): list of the wanted labels and their organization
-        # For example:
-        [
-        0,
-        [1, 3],
-        [2, 4, 5],
-        6
-        ]
-
-    will return categorical labels where labels are 0, 1, 2 and 3 with:
-        - 0 having images from class 0;
-        - 1 having images from classes 1 and 3
-        - 2 having images from classes 2, 4, 5
-        - 3 having images from class 6
-
-    categorical: if True a categorical verison of the labels is returned.
-                    If False, the labels are returned as a 1D numpy array.
-    '''
-    # check inputs
-    assert type(labels) is np.ndarray, 'Labels should be np.ndarray. Given {}'.format(type(labels))
-    assert type(unique_labels) is list, 'unique_labels should be list. Given {}'.format(tyep(unique_labels))
-
-    if not isinstance(classification_type, str):
-        raise TypeError(f'classification_type expected to be a list, but give {type(classification_type)}')
-    else:
-        # check that it specifies a know classification type
-        if not (classification_type=='c1' or classification_type=='c2' or classification_type=='c3'):
-            # raise Warning(f'classification_type expected to be c1, c2 or c3. Instead was given {classification_type}\n')
-            # print('Setting classification type to c3 to be able to fix the labels. * Check that this is correct!')
-            classification_type = 'c3'
-
-    # get the right label list based on the classification type
-    if classification_type=='c1':
-        labels = labels[:,0]
-    elif classification_type=='c2':
-        labels = labels[:,1]
-    elif classification_type=='c3':
-        labels = labels[:,2]
-
-    # get the appropriate label based on the unique label specification
-    for idy, label in enumerate(labels):
-        for idx, u_label in enumerate(unique_labels):
-            if type(u_label) is list:
-                for i in u_label:
-                    if label == i:
-                        labels[idy] = int(idx)
-                        # break
-            elif type(u_label) is not list:
-                if label == u_label:
-                    labels[idy] = int(idx)
-                    # break
-    if categorical == True:
-        # convert labels to categorical
-        return tf.convert_to_tensor(to_categorical(labels, num_classes=len(unique_labels)), dtype=tf.float32)
-    else:
-        return tf.convert_to_tensor(labels, dtype=tf.float32)
-
-
 def leraningRateScheduler(lr_start, current_epoch, max_epochs, power, constant=None):
     '''
-    Implements a polynimial leraning rate decay based on the:
+    Implements a polynomial learning rate decay based on the:
     - lr_start: initial learning rate
     - current_epoch: current epoch
     - max_epochs: max epochs
@@ -197,7 +128,7 @@ def leraningRateScheduler(lr_start, current_epoch, max_epochs, power, constant=N
 
 def accuracy(y_true, y_pred):
     '''
-    Computes the accuracy number of correct classified / total number of samples
+    Computes the accuracy number of correct classified/total number of samples
     '''
     count = tf.reduce_sum(tf.cast(tf.argmax(y_true, -1) == tf.argmax(y_pred, -1),dtype=tf.int64))
     total = tf.cast(tf.reduce_sum(y_true),dtype=tf.int64)
@@ -339,7 +270,7 @@ def plotLearningRate(lr_history, save_path, display=False):
 
 def plotVAEreconstruction(original, reconstructed, epoch, save_path, display=False):
     '''
-    Plots the reconstructed imageg from the VAE along with the original input image.
+    Plots the reconstructed images from the VAE along with the original input image.
     '''
 
     fig , ax = plt.subplots(nrows=3, ncols=2, figsize=(15,10))
@@ -415,13 +346,13 @@ def plotVAEreconstruction(original, reconstructed, epoch, save_path, display=Fal
 def plotVAElatentSpace(y, x_latent_space, unique_labels, label_description, epoch, save_path, display=False):
     '''
     Utility that given the latent space representation of the data, plots the
-    data distribution in a 2D scatered plot where the 2 dimensions are identified
+    data distribution in a 2D scattered plot where the 2 dimensions are identified
     through PCA
     '''
     from sklearn.decomposition import PCA
 
     '''
-    TO be implemented: handle the missing or incompatible inputs
+    To be implemented: handle the missing or incompatible inputs
     '''
 
     pca = PCA(n_components=2)
