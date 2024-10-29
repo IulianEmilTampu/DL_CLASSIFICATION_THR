@@ -6,6 +6,7 @@ This repository contains code for the classification of thyroid tissue in optica
 [Journal](https://doi.org/10.1002/jbio.202200227) | [Cite](#reference)
 
 **Abstract**
+
 Intraoperative guidance tools for thyroid surgery based on optical coherence tomography (OCT) could aid in distinguishing between normal and diseased tissue. However, OCT images are difficult to interpret, thus, real-time automatic analysis could support clinical decision-making. In this study, several deep-learning models were investigated for thyroid disease classification on 2D and 3D OCT data obtained from ex vivo specimens of 22 patients undergoing surgery and diagnosed with several thyroid pathologies. Additionally, two open-access datasets were used to evaluate the custom models. On the thyroid dataset, the best performance was achieved by the 3D vision transformer model with Matthew's correlation coefficient (MCC) of 0.79 (accuracy = 0.90) for the normal-versus-abnormal classification. On the open-access datasets, the custom models achieved the best performance (MCC > 0.88, accuracy > 0.96). Results obtained for the normal-versus-abnormal classification suggest OCT, complemented with deep learning-based analysis, as a tool for real-time automatic diseased tissue identification in thyroid surgery.
 
 **Key highlights:**
@@ -13,20 +14,36 @@ Intraoperative guidance tools for thyroid surgery based on optical coherence tom
 - Models achieve high accuracy on both thyroid and open-access OCT datasets.
 - Best performance with a 3D vision transformer model on normal-versus-abnormal classification.
 ## Table of Contents
-- [Requirements](#requirements)
-- [Usage](#usage)
+- [Setup](#setup)
 - [Code Structure](#code-structure)
+- [Usage](#usage)
 - [Reference](#reference)
 - [License](#license)
 
-## Requirements
-This project was developed in Python. You can create a conda environment and install dependencies by: (TODO):
-
+## Set up
+(TODO) This project was developed in Python. You can create a conda environment and install dependencies by:
 ```bash
 conda create -n thr_dl_cl python=3.8 -y
 conda activate thr_dl_cl
 pip install requirements.txt
 ```
+
+## Code Structure
+
+The repository is organized as follows:
+
+- **Data Preparation**:
+  - `create_dataset.py` and `create_dataset_3D.py`: Scripts to prepare 2D and 3D OCT datasets for training and testing.
+- **Model Training and Evaluation**:
+  - `run_training.py` and `run_training_3D.py`: Scripts for training 2D and 3D models on OCT data.
+  - `test_model.py` and `test_model_3D.py`: Scripts to evaluate models on test data.
+  - `resume_training.py`: Allows resumption of model training.
+- **Utilities and Visualization**:
+  - `models_tf.py` and `models_3D_tf.py`: Contain the definitions of the models.
+  - `utilities.py` and `utilities_models_tf.py`: Utility functions for data handling, model evaluation, and performance metrics.
+  - `visualize_dataset.py` and `visualize_activation_maps.py`: Tools for dataset inspection and model activation map visualization.
+  - `print_model_performance.py`: Summarizes and outputs model performance metrics.
+
 
 ## Usage
 
@@ -54,7 +71,7 @@ python configure_training.py -wd PATH_working_folder -df PATH_to_destination/2D_
 This will create a config.json file saved in PATH_working_folder/trained_models/TEST_LightOCT containing the information about the model and its configuration as well as the training, validation, and testing file names used during model training and evaluation.
 
 ### 3. Model Training
-- Run `run_training.py` for 2D models or `run_training_3D.py` for 3D models to initiate the training process. The run_training scripts use the information available in the config.json file to create the model as well as the data-generators used to load and process the data during training. Use the command below to see al the settings:
+- Run `run_training.py` for 2D models or `run_training_3D.py` for 3D models to initiate the training process. The run_training scripts use the information available in the config.json file to create the model as well as the data-generators used to load and process the data during training. Use the command below to see all the settings:
 ```bash
 python run_training.py --help
 ```
@@ -80,22 +97,6 @@ This will generate test summary files, and plot the confusion matrix of the mode
 Use the following scripts for analysis and visualization:
 - `print_model_performance.py`: Outputs and summarizes model performance metrics.
 - `visualize_dataset.py` and `visualize_activation_maps.py`: Inspect dataset samples and model activation maps for model interpretability.
-
-## Code Structure
-
-The repository is organized as follows:
-
-- **Data Preparation**:
-  - `create_dataset.py` and `create_dataset_3D.py`: Scripts to prepare 2D and 3D OCT datasets for training and testing.
-- **Model Training and Evaluation**:
-  - `run_training.py` and `run_training_3D.py`: Scripts for training 2D and 3D models on OCT data.
-  - `test_model.py` and `test_model_3D.py`: Scripts to evaluate models on test data.
-  - `resume_training.py`: Allows resumption of model training.
-- **Utilities and Visualization**:
-  - `models_tf.py` and `models_3D_tf.py`: Contain the definitions of the models.
-  - `utilities.py` and `utilities_models_tf.py`: Utility functions for data handling, model evaluation, and performance metrics.
-  - `visualize_dataset.py` and `visualize_activation_maps.py`: Tools for dataset inspection and model activation map visualization.
-  - `print_model_performance.py`: Summarizes and outputs model performance metrics.
 
 Additionally, an example of a bash script that uses the above Python scripts that runs training configuration, model training, and testing is also provided (`LightOCT.sh`)
 
