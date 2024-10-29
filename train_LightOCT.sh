@@ -8,7 +8,7 @@ Help()
    echo "Syntax: run_training [w|d|g]"
    echo "required inputs:"
    echo "w     Working folder (where the scripts are)"
-   echo "d     Dataset folder (were the data is located)"
+   echo "d     Dataset folder (where the data is located)"
    echo "g     GPU number on which to run training"
    echo
 }
@@ -42,7 +42,7 @@ cd $working_folder
 
 # create trained_log_file folder
 if ! [ -d $working_folder/trained_models_log ]; then
-   echo "Creating folder to save log."
+   echo "Creating folder to save logs."
    mkdir $working_folder/trained_models_log
 fi
 
