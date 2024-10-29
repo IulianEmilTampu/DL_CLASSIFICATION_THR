@@ -1,13 +1,13 @@
 """
-Script that runs the training of a deep leaning model for classification
+Script that runs the training of a deep learning model for classification
 of 2D OCT thyroid images using the configurations saved by the configure_training.py file.
 
 Steps
 - loads the configuration file
-- create trainig/validation/test dataloader with on-the-fly augmentation
-- load the CNN model and define loss function and training hyperparamters
+- create training/validation/test dataloader with on-the-fly augmentation
+- load the CNN model and define the loss function and training hyperparameters
 - train the model
-- save trained model along with training curves.
+- save the trained model along with training curves.
 """
 
 import os
@@ -68,7 +68,7 @@ parser.add_argument(
     "-p",
     "--patience",
     required=False,
-    help="Set the patiencs for early stopping. Default 25",
+    help="Set the patients for early stopping. Default 25",
     default=25,
 )
 args = parser.parse_args()
@@ -88,13 +88,6 @@ max_epochs = int(args.epocs)
 patience = int(args.patience)
 folds = [int(i) for i in args.folds] if args.folds != "None" else None
 
-# # # # # # # # # # # # # # # DEBUG
-# configuration_file = '/flush/iulta54/Research/P3-OCT_THR/trained_models/test_M4_2D_prj/config.json'
-# debug = False
-# max_epochs = 300
-# patience = 300
-# folds = None
-
 if not os.path.isfile(configuration_file):
     raise ValueError(
         f"Configuration file not found. Run the configure_training.py script first. Given {configuration_file}"
@@ -107,7 +100,7 @@ if debug is True:
     print(f"{string:^{l}}")
     print(f'{"-"*l}\n')
 
-    # reducing the number of training epochs
+    # Reducing the number of training epochs
     max_epochs = 4
     patience = 4
 
@@ -129,7 +122,7 @@ for cv in folds:
     ):
         os.mkdir(os.path.join(config["save_model_path"], "fold_" + str(cv + 1)))
 
-## initialise variables where to save test summary
+## initialize variables where to save test summary
 
 test_fold_summary = {}
 
@@ -195,7 +188,7 @@ for cv in folds:
             kernel_size=config["kernel_size"],
             input_size=config["input_size"],
         )
-    elif config["model_configuration"] == "M2":  # (REMAINING FROM TESTING)
+    elif config["model_configuration"] == "M2":  # (Kept as a reference since this model configuration was tested. Not supported in the last code version)
         model = models_tf.M2(
             number_of_input_channels=1,
             model_name="M2",
@@ -236,7 +229,7 @@ for cv in folds:
             data_augmentation=config["data_augmentation"],
             class_weights=config["class_weights"],
         )
-    elif config["model_configuration"] == "EfficientNet_B7":  # (REMAINING FROM TESTING)
+    elif config["model_configuration"] == "EfficientNet_B7":  # (Kept as a reference since this model configuration was tested. Not supported in the last code version)
         model = models_tf.EfficientNet_B7(
             number_of_input_channels=1,
             model_name=config["model_configuration"],
@@ -244,7 +237,7 @@ for cv in folds:
             data_augmentation=config["data_augmentation"],
             class_weights=config["class_weights"],
         )
-    elif config["model_configuration"] == "InceptionV3":  # (REMAINING FROM TESTING)
+    elif config["model_configuration"] == "InceptionV3":  # (Kept as a reference since this model configuration was tested. Not supported in the last code version)
         model = models_tf.InceptionV3(
             number_of_input_channels=1,
             model_name=config["model_configuration"],
@@ -253,7 +246,7 @@ for cv in folds:
             class_weights=config["class_weights"],
             input_size=config["input_size"],
         )
-    elif config["model_configuration"] == "VAE_DEBUG":  # (REMAINING FROM TESTING)
+    elif config["model_configuration"] == "VAE_DEBUG":  # (Kept as a reference since this model configuration was tested. Not supported in the last code version)
         model = models_tf.VAE_DEBUG(
             number_of_input_channels=1,
             model_name=config["model_configuration"],
@@ -290,7 +283,7 @@ for cv in folds:
     warm_up_epochs = 5
     warm_up_learning_rate = 0.00001
 
-    if "VAE" in config["model_configuration"]:  # (REMAINING FROM TESTING)
+    if "VAE" in config["model_configuration"]: # (Kept as a reference since this model configuration was tested. Not supported in the last code version)
         utilities_models_tf.train_VAE(
             model,
             train_dataset,
