@@ -16,6 +16,7 @@ Intraoperative guidance tools for thyroid surgery based on optical coherence tom
 
 ## Table of Contents
 - [Setup](#setup)
+- [Dataset](#dataset
 - [Code Structure](#code-structure)
 - [Usage](#usage)
 - [Reference](#reference)
@@ -28,6 +29,9 @@ conda create -n thr_dl_cl python=3.8 -y
 conda activate thr_dl_cl
 pip install requirements.txt
 ```
+
+## Dataset
+The clinical data used in this study cannot be made publicly available given (1) that it contains sensitive personal information and (2) the legal restrictions related to ethical approval.
 
 ## Code Structure
 
