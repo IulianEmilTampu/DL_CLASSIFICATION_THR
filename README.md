@@ -5,14 +5,15 @@ This repository contains code for the classification of thyroid tissue in optica
 
 [Journal](https://doi.org/10.1002/jbio.202200227) | [Cite](#reference)
 
-**Abstract**
-
-Intraoperative guidance tools for thyroid surgery based on optical coherence tomography (OCT) could aid in distinguishing between normal and diseased tissue. However, OCT images are difficult to interpret, thus, real-time automatic analysis could support clinical decision-making. In this study, several deep-learning models were investigated for thyroid disease classification on 2D and 3D OCT data obtained from ex vivo specimens of 22 patients undergoing surgery and diagnosed with several thyroid pathologies. Additionally, two open-access datasets were used to evaluate the custom models. On the thyroid dataset, the best performance was achieved by the 3D vision transformer model with Matthew's correlation coefficient (MCC) of 0.79 (accuracy = 0.90) for the normal-versus-abnormal classification. On the open-access datasets, the custom models achieved the best performance (MCC > 0.88, accuracy > 0.96). Results obtained for the normal-versus-abnormal classification suggest OCT, complemented with deep learning-based analysis, as a tool for real-time automatic diseased tissue identification in thyroid surgery.
-
 **Key highlights:**
 - Real-time analysis potential for surgical support.
 - Models achieve high accuracy on both thyroid and open-access OCT datasets.
 - Best performance with a 3D vision transformer model on normal-versus-abnormal classification.
+
+**Abstract**
+
+Intraoperative guidance tools for thyroid surgery based on optical coherence tomography (OCT) could aid in distinguishing between normal and diseased tissue. However, OCT images are difficult to interpret, thus, real-time automatic analysis could support clinical decision-making. In this study, several deep-learning models were investigated for thyroid disease classification on 2D and 3D OCT data obtained from ex vivo specimens of 22 patients undergoing surgery and diagnosed with several thyroid pathologies. Additionally, two open-access datasets were used to evaluate the custom models. On the thyroid dataset, the best performance was achieved by the 3D vision transformer model with Matthew's correlation coefficient (MCC) of 0.79 (accuracy = 0.90) for the normal-versus-abnormal classification. On the open-access datasets, the custom models achieved the best performance (MCC > 0.88, accuracy > 0.96). Results obtained for the normal-versus-abnormal classification suggest OCT, complemented with deep learning-based analysis, as a tool for real-time automatic diseased tissue identification in thyroid surgery.
+
 ## Table of Contents
 - [Setup](#setup)
 - [Code Structure](#code-structure)
