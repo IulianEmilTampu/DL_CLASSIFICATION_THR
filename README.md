@@ -16,7 +16,7 @@ Intraoperative guidance tools for thyroid surgery based on optical coherence tom
 
 ## Table of Contents
 - [Setup](#setup)
-- [Dataset](#dataset
+- [Dataset](#dataset)
 - [Code Structure](#code-structure)
 - [Usage](#usage)
 - [Reference](#reference)
