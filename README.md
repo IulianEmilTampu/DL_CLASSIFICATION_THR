@@ -6,7 +6,7 @@ This repository contains code for the classification of thyroid tissue in optica
 [Journal](https://doi.org/10.1002/jbio.202200227) | [Cite](#reference)
 
 **Key highlights:**
-- Real-time analysis potential for surgical support.
+- Real-time analysis of volumetric OCT data with potential for surgical support.
 - Models achieve high accuracy on both thyroid and open-access OCT datasets.
 - Best performance with a 3D vision transformer model on normal-versus-abnormal classification.
 
